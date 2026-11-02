@@ -1,18 +1,22 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import PantoneSelector from "./components/PantoneSelector";
 import SustratoSelector from "./components/SustratoSelector";
 import FamiliaSelector from "./components/FamiliaSelector";
 import ResistenciasSelector, { Resistencias } from "./components/ResistenciasSelector";
 import TintasBaseManager from "./components/TintasBaseManager";
 import IteracionPanel from "./components/IteracionPanel";
+import ColorConversionTestPanel from "./components/ColorConversionTestPanel";
+import PantoneDatabaseViewer from "./components/PantoneDatabaseViewer";
+import LegalDisclaimer from "./components/LegalDisclaimer";
 import { PantoneColor } from "./data/pantoneLab";
 import { Sustrato } from "./data/sustratos";
 import { FamiliaTinta, TintaBase, tintasBase } from "./data/tintasBase";
 import { formularColor, Formulacion, labToHex } from "./utils/colorCalculations";
-import { Beaker, Sparkles, ChevronRight, AlertCircle, Palette } from "lucide-react";
+import { runColorConversionTests } from "./utils/colorConversionTest";
+import { Beaker, Sparkles, ChevronRight, AlertCircle, Palette, TestTube, BookOpen } from "lucide-react";
 
 type Step = "config" | "formulacion" | "iteracion";
-type Tab = "formulacion" | "tintas";
+type Tab = "formulacion" | "tintas" | "tests" | "pantones";
 
 export default function App() {
   const [step, setStep] = useState<Step>("config");
@@ -32,6 +36,18 @@ export default function App() {
     alcalino: false
   });
   const [toleranciaDeltaE, setToleranciaDeltaE] = useState<number>(2.0);
+
+  // Ejecutar tests de conversión de color al cargar
+  useEffect(() => {
+    console.log("\n🔬 EJECUTANDO TESTS DE CONVERSIÓN DE COLOR\n");
+    const testResults = runColorConversionTests();
+    
+    if (testResults.failedTests > 0) {
+      console.warn("\n⚠️  ALGUNOS TESTS FALLARON. Revisar las conversiones.");
+    } else {
+      console.log("\n✅ TODOS LOS TESTS PASARON. Conversiones validadas.");
+    }
+  }, []);
 
   // Filtrar tintas por familia y resistencias
   const tintasFiltradas = useMemo(() => {
@@ -132,6 +148,28 @@ export default function App() {
               <Palette className="w-4 h-4" />
               Gestión Tintas Base
             </button>
+            <button
+              onClick={() => setActiveTab("tests")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === "tests"
+                  ? "bg-green-600 text-white"
+                  : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+              }`}
+            >
+              <TestTube className="w-4 h-4" />
+              Tests
+            </button>
+            <button
+              onClick={() => setActiveTab("pantones")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === "pantones"
+                  ? "bg-pink-600 text-white"
+                  : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+              }`}
+            >
+              <BookOpen className="w-4 h-4" />
+              Pantone DB
+            </button>
           </div>
 
           {/* Step indicator */}
@@ -152,11 +190,36 @@ export default function App() {
         </div>
       </header>
 
+      {/* Legal Disclaimer */}
+      <LegalDisclaimer />
+
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-6">
         {activeTab === "tintas" && (
           <div className="max-w-7xl mx-auto">
             <TintasBaseManager />
+          </div>
+        )}
+
+        {activeTab === "tests" && (
+          <div className="max-w-4xl mx-auto space-y-6">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-black mb-2">Tests de Validación</h2>
+              <p className="text-gray-400 text-sm">Verificación de conversiones RGB ↔ LAB y precisión Delta E</p>
+            </div>
+            
+            <ColorConversionTestPanel />
+          </div>
+        )}
+
+        {activeTab === "pantones" && (
+          <div className="max-w-7xl mx-auto space-y-6">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-black mb-2">Base de Datos Pantone</h2>
+              <p className="text-gray-400 text-sm">Explora y busca en la base de datos de colores Pantone</p>
+            </div>
+            
+            <PantoneDatabaseViewer />
           </div>
         )}
 
