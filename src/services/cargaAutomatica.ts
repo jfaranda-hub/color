@@ -1,13 +1,16 @@
 /**
  * Servicio para cargar automáticamente la biblioteca base de colores Pantone
  * al iniciar la aplicación
+ * 
+ * Fuente: https://github.com/aj90909/unofficial-pantone-solid-coated-2024-v5
+ * Total: 3,219 colores Pantone Solid Coated 2024
  */
 
 import { parsePantoneCSV } from './parserCSV';
 import { crearBiblioteca, getBibliotecas } from './gestorBibliotecas';
 
 const BIBLIOTECA_BASE_ID = 'biblioteca-base-pantone-2024';
-const BIBLIOTECA_BASE_NOMBRE = 'Pantone Solid Coated 2024';
+const BIBLIOTECA_BASE_NOMBRE = 'Pantone Solid Coated 2024 (3,219 colores)';
 
 /**
  * Verifica si la biblioteca base ya está cargada
@@ -39,7 +42,8 @@ export async function cargarBibliotecaBase(): Promise<{
   }
 
   try {
-    console.log('📚 Cargando biblioteca base de colores Pantone...');
+    console.log('📚 Cargando biblioteca base de colores Pantone (3,219 colores)...');
+    console.log('📂 Fuente: https://github.com/aj90909/unofficial-pantone-solid-coated-2024-v5');
     
     // Intentar cargar el archivo CSV
     const response = await fetch('/src/data/colors.csv');
@@ -50,8 +54,12 @@ export async function cargarBibliotecaBase(): Promise<{
 
     const csvContent = await response.text();
     
+    console.log(`📊 Archivo CSV cargado: ${(csvContent.length / 1024).toFixed(2)} KB`);
+    
     // Parsear el CSV
     const parseResult = parsePantoneCSV(csvContent);
+    
+    console.log(`🔍 Parseo completado: ${parseResult.totalValidos} colores válidos de ${parseResult.totalProcesados} procesados`);
     
     if (!parseResult.success || parseResult.colores.length === 0) {
       throw new Error(`No se encontraron colores válidos. Errores: ${parseResult.errores.join(', ')}`);
@@ -74,12 +82,16 @@ export async function cargarBibliotecaBase(): Promise<{
         localStorage.setItem('flexcolor_bibliotecas', JSON.stringify(bibliotecas));
       }
 
-      console.log(`✅ Biblioteca base cargada: ${parseResult.totalValidos} colores`);
+      console.log(`✅ Biblioteca base cargada exitosamente: ${parseResult.totalValidos} colores Pantone`);
+      
+      if (result.errores.length > 0) {
+        console.warn(`⚠️  Advertencias durante el parseo: ${result.errores.length}`);
+      }
       
       return {
         success: true,
         totalColores: parseResult.totalValidos,
-        errores: parseResult.errores
+        errores: result.errores
       };
     } else {
       throw new Error(`Error al crear biblioteca base: ${result.errores.join(', ')}`);
@@ -102,6 +114,7 @@ export function getBibliotecaBaseInfo(): {
   existe: boolean;
   totalColores: number;
   activa: boolean;
+  nombre: string;
 } {
   const bibliotecas = getBibliotecas();
   const base = bibliotecas.find(b => b.id === BIBLIOTECA_BASE_ID);
@@ -110,13 +123,15 @@ export function getBibliotecaBaseInfo(): {
     return {
       existe: false,
       totalColores: 0,
-      activa: false
+      activa: false,
+      nombre: BIBLIOTECA_BASE_NOMBRE
     };
   }
 
   return {
     existe: true,
     totalColores: base.totalColores,
-    activa: base.activa
+    activa: base.activa,
+    nombre: base.nombre
   };
 }
