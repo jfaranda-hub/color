@@ -7,6 +7,7 @@ import TintasBaseManager from "./components/TintasBaseManager";
 import IteracionPanel from "./components/IteracionPanel";
 import ColorConversionTestPanel from "./components/ColorConversionTestPanel";
 import PantoneDatabaseViewer from "./components/PantoneDatabaseViewer";
+import PantoneImporter from "./components/PantoneImporter";
 import LegalDisclaimer from "./components/LegalDisclaimer";
 import { PantoneColor } from "./data/pantoneLab";
 import { Sustrato } from "./data/sustratos";
@@ -216,9 +217,10 @@ export default function App() {
           <div className="max-w-7xl mx-auto space-y-6">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-black mb-2">Base de Datos Pantone</h2>
-              <p className="text-gray-400 text-sm">Explora y busca en la base de datos de colores Pantone</p>
+              <p className="text-gray-400 text-sm">Importa, explora y busca colores Pantone</p>
             </div>
             
+            <PantoneImporter />
             <PantoneDatabaseViewer />
           </div>
         )}
