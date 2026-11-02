@@ -487,19 +487,19 @@ export function calcularAjusteAutomatico(
   explicacion: string;
 } | null {
   const deltaEActual = getDeltaE00(labMedido, labObjetivo);
-  
   let mejorTinta: TintaBase | null = null;
   let mejoresGramos: number = 0;
   let menorDeltaE = deltaEActual;
-
-  const cantidadesSimulacion = [0.5, 1.0];
+  let mejorLabSimulado: LABColor | null = null;
+  
+  const cantidadesSimulacion = [0.5, 1.0, 1.5]; // Probamos 3 cantidades para mayor precisión
 
   for (const tinta of tintas) {
-    const yaEnMezcla = insumosActuales.some(inp => inp.tintaId === tinta.id);
-    if (tinta.id === "transparente" && yaEnMezcla) continue;
-
+    if (tinta.id === "transparente") continue; // El transparente no corrige color, solo opacidad
+    
     for (const gramosAñadir of cantidadesSimulacion) {
-      const insumosSimulados = [...insumosActuales];
+      // CORRECCIÓN CRÍTICA: Copia profunda del array para no corromper datos originales
+      const insumosSimulados = insumosActuales.map(inp => ({ ...inp }));
       const tintaExistente = insumosSimulados.find(inp => inp.tintaId === tinta.id);
       
       if (tintaExistente) {
@@ -512,57 +512,42 @@ export function calcularAjusteAutomatico(
           porcentaje: 0
         });
       }
-
+      
       const totalGramos = insumosSimulados.reduce((sum, inp) => sum + inp.gramos, 0);
-      insumosSimulados.forEach(inp => {
-        inp.porcentaje = (inp.gramos / totalGramos) * 100;
-      });
-
+      insumosSimulados.forEach(inp => { inp.porcentaje = (inp.gramos / totalGramos) * 100; });
+      
       const labSimulado = calcularLABMezcla(insumosSimulados, tintas, sustrato);
       const deltaESimulado = getDeltaE00(labSimulado, labObjetivo);
-
+      
       if (deltaESimulado < menorDeltaE) {
         menorDeltaE = deltaESimulado;
         mejorTinta = tinta;
         mejoresGramos = gramosAñadir;
+        mejorLabSimulado = labSimulado;
       }
     }
   }
-
-  if (!mejorTinta) {
-    return null;
+  
+  if (!mejorTinta || !mejorLabSimulado || menorDeltaE >= deltaEActual) {
+    return null; // No se encontró mejora
   }
-
+  
   const mejora = deltaEActual - menorDeltaE;
-  const dL = labObjetivo.L - labMedido.L;
-  const da = labObjetivo.a - labMedido.a;
-  const db = labObjetivo.b - labMedido.b;
-
+  const dL = mejorLabSimulado.L - labMedido.L;
+  const da = mejorLabSimulado.a - labMedido.a;
+  const db = mejorLabSimulado.b - labMedido.b;
+  
   let correccion = "";
-  if (Math.abs(da) > Math.abs(db)) {
-    if (da > 0) {
-      correccion = "corregir la desviación hacia el verde";
-    } else {
-      correccion = "corregir la desviación hacia el rojo";
-    }
+  if (Math.abs(da) >= Math.abs(db)) {
+    correccion = da > 0 ? "corregir la desviación hacia el verde (añadiendo rojo/magenta)" : "corregir la desviación hacia el rojo (añadiendo verde/azul)";
   } else {
-    if (db > 0) {
-      correccion = "corregir la desviación hacia el azul";
-    } else {
-      correccion = "corregir la desviación hacia el amarillo";
-    }
+    correccion = db > 0 ? "corregir la desviación hacia el azul (añadiendo amarillo)" : "corregir la desviación hacia el amarillo (añadiendo azul)";
   }
-
-  if (Math.abs(dL) > 2) {
-    if (dL > 0) {
-      correccion += " y aumentar luminosidad";
-    } else {
-      correccion += " y reducir luminosidad";
-    }
+  
+  if (Math.abs(dL) > 1.5) {
+    correccion += dL > 0 ? " y aclarar el tono" : " y oscurecer el tono";
   }
-
-  const explicacion = `Añadir ${mejoresGramos.toFixed(1)}g de ${mejorTinta.name} para ${correccion}. ΔE*00: ${deltaEActual.toFixed(2)} → ${menorDeltaE.toFixed(2)}`;
-
+  
   return {
     tintaId: mejorTinta.id,
     tintaName: mejorTinta.name,
@@ -570,6 +555,6 @@ export function calcularAjusteAutomatico(
     deltaEAntes: Math.round(deltaEActual * 100) / 100,
     deltaEDespues: Math.round(menorDeltaE * 100) / 100,
     mejora: Math.round(mejora * 100) / 100,
-    explicacion
+    explicacion: `Se recomienda añadir ${mejoresGramos}g de ${mejorTinta.name} para ${correccion}. Esto reducirá el ΔE*00 de ${deltaEActual.toFixed(2)} a ${menorDeltaE.toFixed(2)}.`
   };
 }

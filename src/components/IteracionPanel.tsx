@@ -48,33 +48,73 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, toler
 
     Papa.parse(file, {
       complete: (results) => {
-        const data = results.data as any[];
-        if (data.length > 0) {
-          // Buscar la última fila con datos válidos
-          let lastValidRow = null;
+        console.log("📄 Datos CSV crudos:", results.data);
+        const data = results.data as string[][];
+        
+        if (data.length === 0) {
+          alert("El archivo CSV está vacío.");
+          return;
+        }
+
+        // ESTRATEGIA 1: Buscar cabeceras L, a, b en la primera fila
+        const headerRow = data[0];
+        let lIndex = -1, aIndex = -1, bIndex = -1;
+        
+        if (headerRow && headerRow.length > 0) {
+          headerRow.forEach((header, idx) => {
+            const h = header.trim().toLowerCase();
+            if (h === 'l' || h === 'l*' || h.includes('luminosidad')) lIndex = idx;
+            if (h === 'a' || h === 'a*' || h.includes('rojo')) aIndex = idx;
+            if (h === 'b' || h === 'b*' || h.includes('amarillo')) bIndex = idx;
+          });
+        }
+
+        let lastValidRow: LABColor | null = null;
+
+        if (lIndex >= 0 && aIndex >= 0 && bIndex >= 0) {
+          console.log(`✅ Cabeceras encontradas: L=${lIndex}, a=${aIndex}, b=${bIndex}`);
+          // Buscar la última fila con datos numéricos válidos
+          for (let i = data.length - 1; i >= 1; i--) { // Empezar desde 1 para saltar cabecera
+            const row = data[i];
+            if (row && row.length > Math.max(lIndex, aIndex, bIndex)) {
+              const L = parseFloat(row[lIndex]);
+              const a = parseFloat(row[aIndex]);
+              const b = parseFloat(row[bIndex]);
+              
+              if (!isNaN(L) && !isNaN(a) && !isNaN(b) && L > 0 && L <= 100) {
+                lastValidRow = { L, a, b };
+                console.log(`✅ Datos válidos encontrados en fila ${i}:`, lastValidRow);
+                break;
+              }
+            }
+          }
+        } else {
+          console.log("⚠️ No se encontraron cabeceras claras, usando fallback...");
+          // ESTRATEGIA 2: Fallback - buscar última fila con 3 valores numéricos
           for (let i = data.length - 1; i >= 0; i--) {
             const row = data[i];
             if (row && row.length >= 3) {
-              // Intentar encontrar columnas L, a, b (pueden estar en diferentes posiciones)
               const L = parseFloat(row[0]);
               const a = parseFloat(row[1]);
               const b = parseFloat(row[2]);
               
               if (!isNaN(L) && !isNaN(a) && !isNaN(b) && L > 0 && L <= 100) {
                 lastValidRow = { L, a, b };
+                console.log(`✅ Fallback: datos válidos en fila ${i}:`, lastValidRow);
                 break;
               }
             }
           }
+        }
 
-          if (lastValidRow) {
-            setMedicionLAB(lastValidRow);
-          } else {
-            alert("No se encontraron datos LAB válidos en el CSV. Asegúrate de que el archivo tenga columnas L, a, b.");
-          }
+        if (lastValidRow) {
+          setMedicionLAB(lastValidRow);
+        } else {
+          alert("No se encontraron datos LAB válidos en el CSV. Asegúrate de que el archivo tenga columnas L, a, b.");
         }
       },
       error: (error) => {
+        console.error("❌ Error al leer CSV:", error);
         alert(`Error al leer el CSV: ${error.message}`);
       }
     });
@@ -87,6 +127,7 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, toler
     }
 
     const deltaE = getDeltaE00(medicionLAB, targetLAB);
+    console.log("📏 DeltaE calculado:", deltaE, "Tolerancia:", toleranciaDeltaE);
     
     // Añadir al historial
     const nuevaMedida = {
@@ -101,10 +142,12 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, toler
 
     // Verificar si está dentro de tolerancia
     if (deltaE <= toleranciaDeltaE) {
+      console.log("✅ APROBADO - DeltaE dentro de tolerancia");
       setAprobado(true);
       setAjusteRecomendado(null);
       setShowManualAdjust(false);
     } else {
+      console.log("⚠️ RECHAZADO - Calculando ajuste automático...");
       // Calcular ajuste automático recomendado
       const ajuste = calcularAjusteAutomatico(
         medicionLAB,
@@ -113,6 +156,7 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, toler
         tintasBase,
         sustrato
       );
+      console.log("🔧 Resultado de calcularAjusteAutomatico:", ajuste);
       setAjusteRecomendado(ajuste);
       setAprobado(false);
     }
@@ -126,6 +170,8 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, toler
 
   const handleAplicarAjuste = () => {
     if (!ajusteRecomendado) return;
+
+    console.log("🔧 Aplicando ajuste recomendado:", ajusteRecomendado);
 
     // Actualizar formulación añadiendo los gramos recomendados
     const insumosActualizados = formulacion.insumos.map(inp => {
@@ -156,6 +202,8 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, toler
       porcentaje: Math.round((inp.gramos / totalGramos) * 10000) / 100
     }));
 
+    console.log("✅ Ajuste aplicado. Nuevos insumos:", insumosFinales);
+
     // Recalcular LAB estimado
     const labEstimado = calcularLABMezcla(insumosFinales, tintasBase, sustrato);
     const deltaE = getDeltaE00(labEstimado, targetLAB);
@@ -169,9 +217,11 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, toler
       deltaE: Math.round(deltaE * 100) / 100
     });
 
-    // Limpiar ajuste recomendado
+    // Limpiar ajuste recomendado y medición para que el operador mida de nuevo
     setAjusteRecomendado(null);
     setShowManualAdjust(false);
+    setMedicionLAB({ L: 0, a: 0, b: 0 });
+    console.log("🧹 Limpieza completada. Listo para nueva medición.");
   };
 
   const handleAjusteManual = (tintaId: string, delta: number) => {
