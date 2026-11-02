@@ -6,6 +6,7 @@ import ResistenciasSelector, { Resistencias } from "./components/ResistenciasSel
 import TintasBaseManager from "./components/TintasBaseManager";
 import IteracionPanel from "./components/IteracionPanel";
 import ColorConversionTestPanel from "./components/ColorConversionTestPanel";
+import CIEDE2000ValidationPanel from "./components/CIEDE2000ValidationPanel";
 import PantoneDatabaseViewer from "./components/PantoneDatabaseViewer";
 import PantoneImporter from "./components/PantoneImporter";
 import CargadorBibliotecas from "./components/Bibliotecas/CargadorBibliotecas";
@@ -16,6 +17,7 @@ import { Sustrato } from "./data/sustratos";
 import { FamiliaTinta, TintaBase, tintasBase } from "./data/tintasBase";
 import { formularColor, Formulacion, labToHex } from "./utils/colorCalculations";
 import { runColorConversionTests } from "./utils/colorConversionTest";
+import { runFullValidation } from "./utils/ciede2000Validation";
 import { cargarBibliotecaBase } from "./services/cargaAutomatica";
 import { Beaker, Sparkles, ChevronRight, AlertCircle, Palette, TestTube, BookOpen, Library, FileText } from "lucide-react";
 
@@ -41,7 +43,7 @@ export default function App() {
   });
   const [toleranciaDeltaE, setToleranciaDeltaE] = useState<number>(2.0);
 
-  // Ejecutar tests de conversión de color y cargar biblioteca base al iniciar
+  // Ejecutar tests de conversión de color y validar CIEDE2000 al iniciar
   useEffect(() => {
     console.log("\n🔬 EJECUTANDO TESTS DE CONVERSIÓN DE COLOR\n");
     const testResults = runColorConversionTests();
@@ -50,6 +52,16 @@ export default function App() {
       console.warn("\n⚠️  ALGUNOS TESTS FALLARON. Revisar las conversiones.");
     } else {
       console.log("\n✅ TODOS LOS TESTS PASARON. Conversiones validadas.");
+    }
+
+    // Validar CIEDE2000 contra referencia Sharma et al. (2005)
+    console.log("\n🎯 VALIDANDO CIEDE2000 CONTRA REFERENCIA SHARMA\n");
+    const validation = runFullValidation();
+    
+    if (validation.overall === 'FAIL') {
+      console.error("\n❌ VALIDACIÓN CIEDE2000 FALLIDA. Revisar implementación.");
+    } else {
+      console.log("\n✅ VALIDACIÓN CIEDE2000 EXITOSA. Implementación correcta.");
     }
 
     // Cargar automáticamente la biblioteca base de colores Pantone
@@ -247,6 +259,7 @@ export default function App() {
               <p className="text-gray-400 text-sm">Verificación de conversiones RGB ↔ LAB y precisión Delta E</p>
             </div>
             
+            <CIEDE2000ValidationPanel />
             <ColorConversionTestPanel />
           </div>
         )}
