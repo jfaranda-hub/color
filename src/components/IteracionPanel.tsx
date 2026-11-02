@@ -16,10 +16,11 @@ interface Props {
   formulacion: Formulacion;
   sustrato: Sustrato;
   targetLAB: LABColor;
+  toleranciaDeltaE: number;
   onUpdate: (f: Formulacion) => void;
 }
 
-export default function IteracionPanel({ formulacion, sustrato, targetLAB, onUpdate }: Props) {
+export default function IteracionPanel({ formulacion, sustrato, targetLAB, toleranciaDeltaE, onUpdate }: Props) {
   const [medicionLAB, setMedicionLAB] = useState<LABColor>({ L: 0, a: 0, b: 0 });
   const [hasMedicion, setHasMedicion] = useState(false);
   const [escalaGramos, setEscalaGramos] = useState(1000);
@@ -72,7 +73,7 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, onUpd
     onUpdate(escalada);
   };
 
-  const isDeltaAcceptable = medicionDeltaE <= 2.0;
+  const isDeltaAcceptable = medicionDeltaE <= toleranciaDeltaE;
 
   return (
     <div className="space-y-4">
@@ -238,7 +239,7 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, onUpd
         <div className="bg-gradient-to-r from-green-900/30 to-blue-900/30 rounded-xl border border-green-700 p-4">
           <div className="flex items-center gap-2 mb-3">
             <ArrowUpCircle className="w-5 h-5 text-green-400" />
-            <h3 className="text-sm font-bold text-white">¡Delta E Aceptable! Escalar a Producción</h3>
+            <h3 className="text-sm font-bold text-white">¡ΔE*00 ≤ {toleranciaDeltaE.toFixed(1)} Aceptable! Escalar a Producción</h3>
           </div>
 
           <div className="flex items-center gap-3">

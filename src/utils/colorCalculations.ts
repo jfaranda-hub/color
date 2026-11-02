@@ -427,25 +427,114 @@ function seleccionarTintasRelevantes(L: number, a: number, b: number, tintas: Ti
 }
 
 /**
+ * Buscar tintas base cercanas al color objetivo
+ * Si una tinta base tiene ΔE < 4 con el objetivo, es más eficiente
+ * partir de esa base y ajustarla que formular desde cero.
+ * 
+ * @param targetLAB - Color objetivo (Pantone)
+ * @param tintas - Tintas base disponibles
+ * @param umbral - ΔE máximo para considerar una base como "cercana" (default: 4.0)
+ * @returns Tinta base más cercana si está dentro del umbral, o null
+ */
+export function buscarBaseCercana(
+  targetLAB: LABColor,
+  tintas: TintaBase[],
+  umbral: number = 4.0
+): { tinta: TintaBase; deltaE: number } | null {
+  // Filtrar solo tintas cromáticas (no base transparente/blanco)
+  const tintasCromaticas = tintas.filter(t => 
+    t.tintingStrength > 0 && t.id !== "transparente" && t.id !== "blanco"
+  );
+
+  let mejorBase: TintaBase | null = null;
+  let mejorDeltaE = Infinity;
+
+  for (const tinta of tintasCromaticas) {
+    const tintaLAB: LABColor = { L: tinta.lab.L, a: tinta.lab.a, b: tinta.lab.b };
+    const dE = getDeltaE00(tintaLAB, targetLAB);
+    
+    if (dE < mejorDeltaE) {
+      mejorDeltaE = dE;
+      mejorBase = tinta;
+    }
+  }
+
+  // Solo devolver si está dentro del umbral
+  if (mejorBase && mejorDeltaE < umbral) {
+    return { tinta: mejorBase, deltaE: Math.round(mejorDeltaE * 100) / 100 };
+  }
+
+  return null;
+}
+
+/**
  * Formular color automáticamente usando optimización iterativa
  * con modelo Kubelka-Munk real
+ * 
+ * @param targetL - L* objetivo
+ * @param targetA - a* objetivo
+ * @param targetB - b* objetivo
+ * @param tintas - Tintas base disponibles
+ * @param sustrato - Sustrato de impresión
+ * @param totalGramos - Cantidad total de mezcla (default: 100g)
+ * @param baseCercana - Si se proporciona, usa esta base como punto de partida
  */
 export function formularColor(
   targetL: number, targetA: number, targetB: number,
   tintas: TintaBase[],
   sustrato: Sustrato,
-  totalGramos: number = 100
+  totalGramos: number = 100,
+  baseCercana: TintaBase | null = null
 ): Formulacion {
   const target: LABColor = { L: targetL, a: targetA, b: targetB };
-  const tintasRelevantes = seleccionarTintasRelevantes(targetL, targetA, targetB, tintas);
+  let tintasRelevantes: TintaBase[];
 
-  // Inicializar proporciones iguales
-  let insumos: FormulacionInsumo[] = tintasRelevantes.map(t => ({
-    tintaId: t.id,
-    tintaName: t.name,
-    gramos: totalGramos / tintasRelevantes.length,
-    porcentaje: 100 / tintasRelevantes.length
-  }));
+  // Si hay una base cercana, usarla como componente principal
+  if (baseCercana) {
+    tintasRelevantes = seleccionarTintasRelevantes(targetL, targetA, targetB, tintas);
+    // Asegurar que la base cercana está en la lista
+    if (!tintasRelevantes.find(t => t.id === baseCercana.id)) {
+      tintasRelevantes.unshift(baseCercana);
+    }
+  } else {
+    tintasRelevantes = seleccionarTintasRelevantes(targetL, targetA, targetB, tintas);
+  }
+
+  // Inicializar proporciones
+  let insumos: FormulacionInsumo[];
+  
+  if (baseCercana) {
+    // Dar mayor proporción a la base cercana (60%) y dividir el resto
+    const baseGramos = totalGramos * 0.6;
+    const restoGramos = totalGramos * 0.4;
+    const otrasTintas = tintasRelevantes.filter(t => t.id !== baseCercana.id);
+    
+    insumos = tintasRelevantes.map(t => {
+      if (t.id === baseCercana.id) {
+        return {
+          tintaId: t.id,
+          tintaName: t.name,
+          gramos: baseGramos,
+          porcentaje: 60
+        };
+      } else {
+        return {
+          tintaId: t.id,
+          tintaName: t.name,
+          gramos: restoGramos / otrasTintas.length,
+          porcentaje: 40 / otrasTintas.length
+        };
+      }
+    });
+  } else {
+    // Proporciones iguales
+    insumos = tintasRelevantes.map(t => ({
+      tintaId: t.id,
+      tintaName: t.name,
+      gramos: totalGramos / tintasRelevantes.length,
+      porcentaje: 100 / tintasRelevantes.length
+    }));
+  }
 
   // Optimización por descenso de gradiente numérico
   const stepSize = totalGramos * 0.02;

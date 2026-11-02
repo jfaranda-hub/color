@@ -5,12 +5,14 @@ import AniloxManager from "./components/AniloxManager";
 import FormulacionPanel from "./components/FormulacionPanel";
 import IteracionPanel from "./components/IteracionPanel";
 import SustratoCalibration from "./components/SustratoCalibration";
+import DeltaEToleranceSelector, { DeltaETolerance, toleranceLevels } from "./components/DeltaEToleranceSelector";
 import { PantoneColor } from "./data/pantoneLab";
 import { Sustrato } from "./data/sustratos";
 import { AniloxConfig } from "./components/AniloxManager";
-import { formularColor, Formulacion, labToHex } from "./utils/colorCalculations";
+import { formularColor, buscarBaseCercana, Formulacion, labToHex, LABColor } from "./utils/colorCalculations";
+import { TintaBase } from "./data/tintasBase";
 import { tintasBase } from "./data/tintasBase";
-import { Beaker, Sparkles, ChevronRight, ScanLine, Wrench } from "lucide-react";
+import { Beaker, Sparkles, ChevronRight, ScanLine, Wrench, Target, AlertTriangle } from "lucide-react";
 
 type Step = "config" | "formulacion" | "iteracion";
 type Tab = "formulacion" | "anilox" | "calibracion";
@@ -23,6 +25,13 @@ export default function App() {
   const [anilox, setAnilox] = useState<AniloxConfig | null>(null);
   const [formulacion, setFormulacion] = useState<Formulacion | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  
+  // Tolerancia ΔE
+  const [tolerancia, setTolerancia] = useState<DeltaETolerance>(toleranceLevels[1]); // Estándar ΔE ≤ 2.0
+  const [customToleranceValue, setCustomToleranceValue] = useState(2.0);
+  
+  // Base cercana encontrada
+  const [baseCercana, setBaseCercana] = useState<{ tinta: TintaBase; deltaE: number } | null>(null);
 
   const handleCalcular = useCallback(() => {
     if (!pantone || !sustrato) return;
@@ -30,11 +39,18 @@ export default function App() {
     setIsCalculating(true);
 
     setTimeout(() => {
+      const targetLAB: LABColor = { L: pantone.L, a: pantone.a, b: pantone.b };
+      
+      // Buscar base cercana (ΔE < 4.0)
+      const baseEncontrada = buscarBaseCercana(targetLAB, tintasBase, 4.0);
+      setBaseCercana(baseEncontrada);
+      
       const result = formularColor(
         pantone.L, pantone.a, pantone.b,
         tintasBase,
         sustrato,
-        100
+        100,
+        baseEncontrada?.tinta || null
       );
       setFormulacion(result);
       setStep("formulacion");
@@ -132,6 +148,14 @@ export default function App() {
                 <div className="space-y-6">
                   <AniloxManager selected={anilox} onSelect={setAnilox} />
 
+                  {/* Tolerancia ΔE */}
+                  <DeltaEToleranceSelector
+                    tolerance={tolerancia}
+                    customValue={customToleranceValue}
+                    onToleranceChange={setTolerancia}
+                    onCustomValueChange={setCustomToleranceValue}
+                  />
+
                   {/* Resumen */}
                   {pantone && sustrato && (
                     <div className="bg-gray-800/50 rounded-xl border border-gray-700 p-4">
@@ -170,6 +194,26 @@ export default function App() {
                           <div className="text-[10px] text-gray-500 font-mono">{pantone.hex}</div>
                         </div>
                       </div>
+
+                      {/* Información sobre base cercana */}
+                      {baseCercana && (
+                        <div className="mt-3 p-3 bg-blue-900/20 rounded-lg border border-blue-700/50">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                            <div className="text-xs">
+                              <div className="font-bold text-blue-400 mb-1">
+                                Base cercana encontrada (ΔE {baseCercana.deltaE.toFixed(2)})
+                              </div>
+                              <div className="text-gray-300">
+                                La tinta base <span className="font-bold text-white">{baseCercana.tinta.name}</span> está a ΔE {baseCercana.deltaE.toFixed(2)} del Pantone objetivo.
+                              </div>
+                              <div className="text-gray-400 mt-1">
+                                Se usará como componente principal (60%) para facilitar la formulación.
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -252,11 +296,11 @@ export default function App() {
                     </li>
                     <li className="flex gap-2">
                       <span className="text-blue-400 font-bold">4.</span>
-                      Si ΔE*00 ≤ 2.0 → Escalar a producción (max 1000g)
+                      Si ΔE*00 ≤ {tolerancia.id === "personalizado" ? customToleranceValue.toFixed(1) : tolerancia.value.toFixed(1)} → Escalar a producción (max 1000g)
                     </li>
                     <li className="flex gap-2">
                       <span className="text-blue-400 font-bold">5.</span>
-                      Si ΔE*00 &gt; 2.0 → Ajustar ±0.05-0.1g y volver a medir
+                      Si ΔE*00 &gt; {tolerancia.id === "personalizado" ? customToleranceValue.toFixed(1) : tolerancia.value.toFixed(1)} → Ajustar ±0.05-0.1g y volver a medir
                     </li>
                   </ol>
                 </div>
@@ -276,7 +320,7 @@ export default function App() {
                   onClick={() => setStep("iteracion")}
                   className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 flex items-center justify-center gap-2"
                 >
-                  <span>📏</span> Ir a Medición y Ajuste
+                  <span>📏</span> Ir a Medición (Tolerancia: ΔE ≤ {tolerancia.id === "personalizado" ? customToleranceValue.toFixed(1) : tolerancia.value.toFixed(1)})
                   <ChevronRight className="w-5 h-5" />
                 </button>
 
@@ -297,7 +341,7 @@ export default function App() {
             <div className="text-center mb-6">
               <h2 className="text-2xl font-black mb-2">Medición y Ajuste</h2>
               <p className="text-gray-400 text-sm">
-                Medir prueba 100g → ΔE*00 ≤ 2.0 → Escalar a 1000g
+                Medir prueba 100g → ΔE*00 ≤ {tolerancia.id === "personalizado" ? customToleranceValue.toFixed(1) : tolerancia.value.toFixed(1)} → Escalar a 1000g
               </p>
             </div>
 
@@ -306,6 +350,7 @@ export default function App() {
                 formulacion={formulacion}
                 sustrato={sustrato}
                 targetLAB={targetLAB}
+                toleranciaDeltaE={tolerancia.id === "personalizado" ? customToleranceValue : tolerancia.value}
                 onUpdate={setFormulacion}
               />
               <div className="space-y-4">
