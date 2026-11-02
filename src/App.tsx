@@ -8,16 +8,18 @@ import IteracionPanel from "./components/IteracionPanel";
 import ColorConversionTestPanel from "./components/ColorConversionTestPanel";
 import PantoneDatabaseViewer from "./components/PantoneDatabaseViewer";
 import PantoneImporter from "./components/PantoneImporter";
+import CargadorBibliotecas from "./components/Bibliotecas/CargadorBibliotecas";
+import GestorFichasTecnicas from "./components/FichasTecnicas/GestorFichasTecnicas";
 import LegalDisclaimer from "./components/LegalDisclaimer";
 import { PantoneColor } from "./data/pantoneLab";
 import { Sustrato } from "./data/sustratos";
 import { FamiliaTinta, TintaBase, tintasBase } from "./data/tintasBase";
 import { formularColor, Formulacion, labToHex } from "./utils/colorCalculations";
 import { runColorConversionTests } from "./utils/colorConversionTest";
-import { Beaker, Sparkles, ChevronRight, AlertCircle, Palette, TestTube, BookOpen } from "lucide-react";
+import { Beaker, Sparkles, ChevronRight, AlertCircle, Palette, TestTube, BookOpen, Library, FileText } from "lucide-react";
 
 type Step = "config" | "formulacion" | "iteracion";
-type Tab = "formulacion" | "tintas" | "tests" | "pantones";
+type Tab = "formulacion" | "tintas" | "tests" | "pantones" | "bibliotecas" | "fichas";
 
 export default function App() {
   const [step, setStep] = useState<Step>("config");
@@ -171,6 +173,28 @@ export default function App() {
               <BookOpen className="w-4 h-4" />
               Pantone DB
             </button>
+            <button
+              onClick={() => setActiveTab("bibliotecas")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === "bibliotecas"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+              }`}
+            >
+              <Library className="w-4 h-4" />
+              Bibliotecas
+            </button>
+            <button
+              onClick={() => setActiveTab("fichas")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === "fichas"
+                  ? "bg-teal-600 text-white"
+                  : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Fichas Técnicas
+            </button>
           </div>
 
           {/* Step indicator */}
@@ -222,6 +246,28 @@ export default function App() {
             
             <PantoneImporter />
             <PantoneDatabaseViewer />
+          </div>
+        )}
+
+        {activeTab === "bibliotecas" && (
+          <div className="max-w-7xl mx-auto space-y-6">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-black mb-2">Gestión de Bibliotecas de Color</h2>
+              <p className="text-gray-400 text-sm">Carga y gestiona múltiples bibliotecas de colores</p>
+            </div>
+            
+            <CargadorBibliotecas />
+          </div>
+        )}
+
+        {activeTab === "fichas" && (
+          <div className="max-w-7xl mx-auto space-y-6">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-black mb-2">Fichas Técnicas</h2>
+              <p className="text-gray-400 text-sm">Gestiona fichas técnicas de tintas y procesos</p>
+            </div>
+            
+            <GestorFichasTecnicas />
           </div>
         )}
 
