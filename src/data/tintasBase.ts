@@ -155,23 +155,5 @@ export const tintasBase: TintaBase[] = [
   }
 ];
 
-// Anilox configurations
-export interface AniloxConfig {
-  id: string;
-  name: string;
-  lineatura: number; // LPI (líneas por pulgada)
-  bcm: number; // BCM (milímetros cúbicos por centímetro cuadrado) - volumen de celda
-  angle: number; // Ángulo de grabado (grados)
-}
-
-export const aniloxConfigs: AniloxConfig[] = [
-  { id: "anilox-360-4.0", name: "360 LPI / 4.0 BCM", lineatura: 360, bcm: 4.0, angle: 60 },
-  { id: "anilox-400-3.5", name: "400 LPI / 3.5 BCM", lineatura: 400, bcm: 3.5, angle: 60 },
-  { id: "anilox-500-2.8", name: "500 LPI / 2.8 BCM", lineatura: 500, bcm: 2.8, angle: 60 },
-  { id: "anilox-600-2.2", name: "600 LPI / 2.2 BCM", lineatura: 600, bcm: 2.2, angle: 60 },
-  { id: "anilox-800-1.5", name: "800 LPI / 1.5 BCM", lineatura: 800, bcm: 1.5, angle: 60 },
-  { id: "anilox-1000-1.0", name: "1000 LPI / 1.0 BCM", lineatura: 1000, bcm: 1.0, angle: 60 },
-  { id: "anilox-360-6.0", name: "360 LPI / 6.0 BCM", lineatura: 360, bcm: 6.0, angle: 60 },
-  { id: "anilox-360-8.0", name: "360 LPI / 8.0 BCM", lineatura: 360, bcm: 8.0, angle: 60 },
-  { id: "anilox-250-10.0", name: "250 LPI / 10.0 BCM", lineatura: 250, bcm: 10.0, angle: 60 },
-];
+// Nota: La gestión de Anilox se realiza desde el componente AniloxManager
+// con persistencia en localStorage y CRUD completo.

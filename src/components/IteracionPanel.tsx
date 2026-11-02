@@ -1,36 +1,34 @@
 import { useState } from "react";
-import { Formulacion, deltaE2000, calcularLABMezcla, labToHex, escalarFormulacion } from "../utils/colorCalculations";
+import {
+  Formulacion,
+  getDeltaE00,
+  calcularLABMezcla,
+  labToHex,
+  escalarFormulacion,
+  evaluateDeltaE,
+  LABColor
+} from "../utils/colorCalculations";
 import { tintasBase } from "../data/tintasBase";
 import { Sustrato } from "../data/sustratos";
 import { Gauge, Plus, Minus, RotateCcw, ArrowUpCircle, CheckCircle2, AlertTriangle } from "lucide-react";
 
-// Re-export evaluateDeltaE with the correct name
-function evaluarDeltaE(dE: number) {
-  if (dE <= 0.5) return { rating: "Excelente", color: "#10B981", description: "Imperceptible" };
-  if (dE <= 1.0) return { rating: "Muy Bueno", color: "#22C55E", description: "Apenas perceptible" };
-  if (dE <= 2.0) return { rating: "Bueno", color: "#84CC16", description: "Aceptable" };
-  if (dE <= 3.5) return { rating: "Aceptable", color: "#EAB308", description: "Notable pero tolerable" };
-  if (dE <= 5.0) return { rating: "Marginal", color: "#F97316", description: "Requiere ajuste" };
-  return { rating: "Rechazado", color: "#EF4444", description: "Reformular" };
-}
-
 interface Props {
   formulacion: Formulacion;
   sustrato: Sustrato;
-  targetLAB: { L: number; a: number; b: number };
+  targetLAB: LABColor;
   onUpdate: (f: Formulacion) => void;
 }
 
 export default function IteracionPanel({ formulacion, sustrato, targetLAB, onUpdate }: Props) {
-  const [medicionLAB, setMedicionLAB] = useState({ L: 0, a: 0, b: 0 });
+  const [medicionLAB, setMedicionLAB] = useState<LABColor>({ L: 0, a: 0, b: 0 });
   const [hasMedicion, setHasMedicion] = useState(false);
   const [escalaGramos, setEscalaGramos] = useState(1000);
 
   const medicionDeltaE = hasMedicion
-    ? deltaE2000(medicionLAB.L, medicionLAB.a, medicionLAB.b, targetLAB.L, targetLAB.a, targetLAB.b)
+    ? getDeltaE00(medicionLAB, targetLAB)
     : 0;
 
-  const evaluation = evaluarDeltaE(medicionDeltaE);
+  const evaluation = evaluateDeltaE(medicionDeltaE);
 
   const handleMedir = () => {
     if (medicionLAB.L > 0 || medicionLAB.a !== 0 || medicionLAB.b !== 0) {
@@ -58,7 +56,7 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, onUpd
     }));
 
     const labEstimado = calcularLABMezcla(insumosFinal, tintasBase, sustrato);
-    const dE = deltaE2000(labEstimado.L, labEstimado.a, labEstimado.b, targetLAB.L, targetLAB.a, targetLAB.b);
+    const dE = getDeltaE00(labEstimado, targetLAB);
 
     onUpdate({
       ...formulacion,
@@ -126,7 +124,7 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, onUpd
             onClick={handleMedir}
             className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors"
           >
-            📏 Medir Delta E
+            📏 Medir Delta E (CIEDE2000)
           </button>
           <button
             onClick={handleReset}
@@ -140,7 +138,7 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, onUpd
           <div className="mt-3 p-3 rounded-xl" style={{ backgroundColor: evaluation.color + "15", border: `1px solid ${evaluation.color}40` }}>
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-xs text-gray-400">ΔE vs Objetivo</div>
+                <div className="text-xs text-gray-400">ΔE*00 vs Objetivo</div>
                 <div className="text-2xl font-black" style={{ color: evaluation.color }}>
                   {medicionDeltaE.toFixed(2)}
                 </div>
@@ -150,14 +148,14 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, onUpd
                   {isDeltaAcceptable ? <CheckCircle2 className="w-6 h-6 inline mr-1" /> : <AlertTriangle className="w-6 h-6 inline mr-1" />}
                   {evaluation.rating}
                 </div>
-                <div className="text-[10px] text-gray-400">{evaluation.description}</div>
+                <div className="text-[10px] text-gray-400">{evaluation.tolerance}</div>
               </div>
             </div>
 
             {/* Desglose de diferencias */}
             <div className="grid grid-cols-3 gap-2 mt-3">
               <div className="text-center bg-gray-800/50 rounded-lg p-2">
-                <div className="text-xs text-gray-400">ΔL</div>
+                <div className="text-xs text-gray-400">ΔL*</div>
                 <div className={`text-sm font-bold ${(medicionLAB.L - targetLAB.L) > 0 ? "text-orange-400" : "text-blue-400"}`}>
                   {(medicionLAB.L - targetLAB.L) > 0 ? "+" : ""}{(medicionLAB.L - targetLAB.L).toFixed(2)}
                 </div>
@@ -166,7 +164,7 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, onUpd
                 </div>
               </div>
               <div className="text-center bg-gray-800/50 rounded-lg p-2">
-                <div className="text-xs text-gray-400">Δa</div>
+                <div className="text-xs text-gray-400">Δa*</div>
                 <div className={`text-sm font-bold ${(medicionLAB.a - targetLAB.a) > 0 ? "text-red-400" : "text-green-400"}`}>
                   {(medicionLAB.a - targetLAB.a) > 0 ? "+" : ""}{(medicionLAB.a - targetLAB.a).toFixed(2)}
                 </div>
@@ -175,7 +173,7 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, onUpd
                 </div>
               </div>
               <div className="text-center bg-gray-800/50 rounded-lg p-2">
-                <div className="text-xs text-gray-400">Δb</div>
+                <div className="text-xs text-gray-400">Δb*</div>
                 <div className={`text-sm font-bold ${(medicionLAB.b - targetLAB.b) > 0 ? "text-yellow-400" : "text-blue-400"}`}>
                   {(medicionLAB.b - targetLAB.b) > 0 ? "+" : ""}{(medicionLAB.b - targetLAB.b).toFixed(2)}
                 </div>
@@ -214,13 +212,13 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, onUpd
                     onClick={() => handleAjuste(inp.tintaId, -0.05)}
                     className="w-6 h-6 bg-red-900/30 hover:bg-red-800/50 border border-red-800 rounded text-[10px] text-red-400 font-bold transition-colors"
                   >
-                    -0.05
+                    -05
                   </button>
                   <button
                     onClick={() => handleAjuste(inp.tintaId, 0.05)}
                     className="w-6 h-6 bg-green-900/30 hover:bg-green-800/50 border border-green-800 rounded text-[10px] text-green-400 font-bold transition-colors"
                   >
-                    +0.05
+                    +05
                   </button>
                   <button
                     onClick={() => handleAjuste(inp.tintaId, 0.1)}
@@ -245,7 +243,7 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, onUpd
 
           <div className="flex items-center gap-3">
             <div className="flex-1">
-              <label className="text-xs text-gray-400 block mb-1">Gramos objetivo</label>
+              <label className="text-xs text-gray-400 block mb-1">Gramos objetivo (max 1000g)</label>
               <input
                 type="number"
                 value={escalaGramos}
@@ -274,19 +272,25 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, onUpd
       {hasMedicion && (
         <div className="flex items-center gap-3">
           <div className="flex-1 text-center">
-            <div className="text-[10px] text-gray-400">Medido</div>
+            <div className="text-[10px] text-gray-400">Medido (Colorímetro)</div>
             <div
               className="w-full h-10 rounded-lg border border-gray-600"
               style={{ backgroundColor: labToHex(medicionLAB.L, medicionLAB.a, medicionLAB.b) }}
             />
+            <div className="text-[9px] text-gray-500 font-mono mt-1">
+              {medicionLAB.L.toFixed(1)}/{medicionLAB.a.toFixed(1)}/{medicionLAB.b.toFixed(1)}
+            </div>
           </div>
           <div className="text-gray-500 text-xs">vs</div>
           <div className="flex-1 text-center">
-            <div className="text-[10px] text-gray-400">Objetivo</div>
+            <div className="text-[10px] text-gray-400">Objetivo (Pantone)</div>
             <div
               className="w-full h-10 rounded-lg border border-gray-600"
               style={{ backgroundColor: labToHex(targetLAB.L, targetLAB.a, targetLAB.b) }}
             />
+            <div className="text-[9px] text-gray-500 font-mono mt-1">
+              {targetLAB.L.toFixed(1)}/{targetLAB.a.toFixed(1)}/{targetLAB.b.toFixed(1)}
+            </div>
           </div>
         </div>
       )}

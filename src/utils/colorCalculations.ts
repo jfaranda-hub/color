@@ -1,129 +1,35 @@
-// Funciones de cálculo de color para formulación flexográfica
-// Basado en estándares CIE y modelos de mezcla sustractiva
+/**
+ * Motor de cálculo de color para formulación flexográfica
+ * 
+ * Librerías utilizadas:
+ * - delta-e: Implementación CIE oficial de Delta E (CIE76, CIE94, CIEDE2000)
+ * - chroma-js: Conversiones entre espacios de color (LAB, RGB, XYZ, LCH)
+ * 
+ * Modelo de mezcla:
+ * - Kubelka-Munk (single-constant): Modelo físico real para mezcla sustractiva
+ *   K/S = (1-R)²/(2R) donde R es reflectancia
+ *   Para mezclas: (K/S)mix = (K/S)sub + Σ ci * (K/S)i
+ * 
+ * Referencias:
+ * - CIE Publication 15:2004 (Colorimetry)
+ * - Kubelka, P. & Munk, F. (1931). "Ein Beitrag zur Optik der Farbanstriche"
+ * - Shore, A.R. (1996). "The Kubelka-Munk Theory"
+ */
 
+import * as DeltaE from "delta-e";
+import chroma from "chroma-js";
 import { TintaBase } from "../data/tintasBase";
 import { Sustrato } from "../data/sustratos";
 
 // ============================================
-// DELTA E - CIEDE2000 (Colorimetric Difference)
+// TIPOS
 // ============================================
 
-export function deltaE76(
-  L1: number, a1: number, b1: number,
-  L2: number, a2: number, b2: number
-): number {
-  return Math.sqrt(
-    Math.pow(L1 - L2, 2) +
-    Math.pow(a1 - a2, 2) +
-    Math.pow(b1 - b2, 2)
-  );
+export interface LABColor {
+  L: number;
+  a: number;
+  b: number;
 }
-
-export function deltaE2000(
-  L1: number, a1: number, b1: number,
-  L2: number, a2: number, b2: number
-): number {
-  // CIEDE2000 - Fórmula completa
-  const kL = 1, kC = 1, kH = 1;
-
-  const C1 = Math.sqrt(a1 * a1 + b1 * b1);
-  const C2 = Math.sqrt(a2 * a2 + b2 * b2);
-  const Cab = (C1 + C2) / 2;
-  const Cab7 = Math.pow(Cab, 7);
-  const G = 0.5 * (1 - Math.sqrt(Cab7 / (Cab7 + Math.pow(25, 7))));
-
-  const ap1 = a1 * (1 + G);
-  const ap2 = a2 * (1 + G);
-
-  const Cp1 = Math.sqrt(ap1 * ap1 + b1 * b1);
-  const Cp2 = Math.sqrt(ap2 * ap2 + b2 * b2);
-
-  let hp1 = Math.atan2(b1, ap1) * 180 / Math.PI;
-  if (hp1 < 0) hp1 += 360;
-  let hp2 = Math.atan2(b2, ap2) * 180 / Math.PI;
-  if (hp2 < 0) hp2 += 360;
-
-  const dLp = L2 - L1;
-  const dCp = Cp2 - Cp1;
-
-  let dhp: number;
-  if (Cp1 * Cp2 === 0) {
-    dhp = 0;
-  } else if (Math.abs(hp2 - hp1) <= 180) {
-    dhp = hp2 - hp1;
-  } else if (hp2 - hp1 > 180) {
-    dhp = hp2 - hp1 - 360;
-  } else {
-    dhp = hp2 - hp1 + 360;
-  }
-
-  const dHp = 2 * Math.sqrt(Cp1 * Cp2) * Math.sin(dhp * Math.PI / 360);
-
-  const Lp = (L1 + L2) / 2;
-  const Cp = (Cp1 + Cp2) / 2;
-
-  let hp: number;
-  if (Cp1 * Cp2 === 0) {
-    hp = hp1 + hp2;
-  } else if (Math.abs(hp1 - hp2) <= 180) {
-    hp = (hp1 + hp2) / 2;
-  } else if (hp1 + hp2 < 360) {
-    hp = (hp1 + hp2 + 360) / 2;
-  } else {
-    hp = (hp1 + hp2 - 360) / 2;
-  }
-
-  const T = 1
-    - 0.17 * Math.cos((hp - 30) * Math.PI / 180)
-    + 0.24 * Math.cos(2 * hp * Math.PI / 180)
-    + 0.32 * Math.cos((3 * hp + 6) * Math.PI / 180)
-    - 0.20 * Math.cos((4 * hp - 63) * Math.PI / 180);
-
-  const SL = 1 + (0.015 * Math.pow(Lp - 50, 2)) / Math.sqrt(20 + Math.pow(Lp - 50, 2));
-  const SC = 1 + 0.045 * Cp;
-  const SH = 1 + 0.015 * Cp * T;
-
-  const Cp7 = Math.pow(Cp, 7);
-  const RT = -2 * Math.sqrt(Cp7 / (Cp7 + Math.pow(25, 7)))
-    * Math.sin(60 * Math.exp(-Math.pow((hp - 275) / 25, 2)) * Math.PI / 180);
-
-  const dE = Math.sqrt(
-    Math.pow(dLp / (kL * SL), 2) +
-    Math.pow(dCp / (kC * SC), 2) +
-    Math.pow(dHp / (kH * SH), 2) +
-    RT * (dCp / (kC * SC)) * (dHp / (kH * SH))
-  );
-
-  return dE;
-}
-
-// ============================================
-// EVALUACIÓN DE DELTA E
-// ============================================
-
-export function evaluateDeltaE(deltaE: number): {
-  rating: string;
-  color: string;
-  description: string;
-} {
-  if (deltaE <= 0.5) {
-    return { rating: "Excelente", color: "#10B981", description: "Diferencia imperceptible" };
-  } else if (deltaE <= 1.0) {
-    return { rating: "Muy Bueno", color: "#22C55E", description: "Diferencia apenas perceptible" };
-  } else if (deltaE <= 2.0) {
-    return { rating: "Bueno", color: "#84CC16", description: "Aceptable para la mayoría de trabajos" };
-  } else if (deltaE <= 3.5) {
-    return { rating: "Aceptable", color: "#EAB308", description: "Diferencia notable pero tolerable" };
-  } else if (deltaE <= 5.0) {
-    return { rating: "Marginal", color: "#F97316", description: "Requiere ajuste" };
-  } else {
-    return { rating: "Rechazado", color: "#EF4444", description: "Diferencia excesiva, reformular" };
-  }
-}
-
-// ============================================
-// FORMULACIÓN DE COLOR - Modelo de mezcla sustractiva
-// ============================================
 
 export interface FormulacionInsumo {
   tintaId: string;
@@ -135,93 +41,405 @@ export interface FormulacionInsumo {
 export interface Formulacion {
   insumos: FormulacionInsumo[];
   totalGramos: number;
-  labEstimado: { L: number; a: number; b: number };
+  labEstimado: LABColor;
   deltaE: number;
   sustratoId: string;
 }
 
-// Calcula el LAB resultante de una mezcla de tintas
-// Usa modelo de mezcla ponderada con corrección por sustrato
+// ============================================
+// DELTA E - Usando librería delta-e (implementación CIE oficial)
+// ============================================
+
+/**
+ * Delta E CIE76 (1976) - Distancia euclidiana en espacio LAB
+ * Simple pero no perceptualmente uniforme
+ */
+export function getDeltaE76(lab1: LABColor, lab2: LABColor): number {
+  return DeltaE.getDeltaE76(
+    { L: lab1.L, A: lab1.a, B: lab1.b },
+    { L: lab2.L, A: lab2.a, B: lab2.b }
+  );
+}
+
+/**
+ * Delta E CIE94 (1994) - Mejora con factores de ponderación
+ * Usado en industria textil
+ */
+export function getDeltaE94(lab1: LABColor, lab2: LABColor): number {
+  return DeltaE.getDeltaE94(
+    { L: lab1.L, A: lab1.a, B: lab1.b },
+    { L: lab2.L, A: lab2.a, B: lab2.b }
+  );
+}
+
+/**
+ * Delta E CIEDE2000 (2000) - Estándar actual
+ * Correcciones para no-uniformidad en azules y neutros
+ * Usado en control de calidad de impresión
+ */
+export function getDeltaE00(lab1: LABColor, lab2: LABColor): number {
+  return DeltaE.getDeltaE00(
+    { L: lab1.L, A: lab1.a, B: lab1.b },
+    { L: lab2.L, A: lab2.a, B: lab2.b }
+  );
+}
+
+// ============================================
+// EVALUACIÓN DE DELTA E (según estándares industria gráfica)
+// ============================================
+
+export function evaluateDeltaE(deltaE: number): {
+  rating: string;
+  color: string;
+  description: string;
+  tolerance: string;
+} {
+  if (deltaE <= 0.5) {
+    return {
+      rating: "Excelente",
+      color: "#10B981",
+      description: "Diferencia imperceptible incluso con instrumentación",
+      tolerance: "Dentro de tolerancia premium (ΔE ≤ 0.5)"
+    };
+  } else if (deltaE <= 1.0) {
+    return {
+      rating: "Muy Bueno",
+      color: "#22C55E",
+      description: "Diferencia apenas perceptible bajo condiciones controladas",
+      tolerance: "Dentro de tolerancia estricta (ΔE ≤ 1.0)"
+    };
+  } else if (deltaE <= 2.0) {
+    return {
+      rating: "Bueno",
+      color: "#84CC16",
+      description: "Match comercial aceptable - estándar de la industria",
+      tolerance: "Dentro de tolerancia comercial (ΔE ≤ 2.0)"
+    };
+  } else if (deltaE <= 3.5) {
+    return {
+      rating: "Aceptable",
+      color: "#EAB308",
+      description: "Diferencia notable pero tolerable en trabajos estándar",
+      tolerance: "Tolerancia amplia (ΔE ≤ 3.5)"
+    };
+  } else if (deltaE <= 5.0) {
+    return {
+      rating: "Marginal",
+      color: "#F97316",
+      description: "Requiere ajuste - diferencia visible",
+      tolerance: "Fuera de tolerancia estándar"
+    };
+  } else {
+    return {
+      rating: "Rechazado",
+      color: "#EF4444",
+      description: "Diferencia excesiva - reformular obligatoriamente",
+      tolerance: "Fuera de toda tolerancia aceptable"
+    };
+  }
+}
+
+// ============================================
+// CONVERSIONES DE COLOR - Usando chroma-js
+// ============================================
+
+/**
+ * Convertir LAB a RGB usando chroma-js
+ * chroma-js usa internamente las matrices CIE estándar
+ */
+export function labToRgb(L: number, a: number, b: number): { r: number; g: number; b: number } {
+  const color = chroma.lab(L, a, b);
+  const rgb = color.rgb();
+  return { r: rgb[0], g: rgb[1], b: rgb[2] };
+}
+
+/**
+ * Convertir LAB a HEX
+ */
+export function labToHex(L: number, a: number, b: number): string {
+  return chroma.lab(L, a, b).hex();
+}
+
+/**
+ * Convertir HEX a LAB
+ */
+export function hexToLab(hex: string): LABColor {
+  const lab = chroma(hex).lab();
+  return { L: lab[0], a: lab[1], b: lab[2] };
+}
+
+/**
+ * Convertir RGB a LAB
+ */
+export function rgbToLab(r: number, g: number, b: number): LABColor {
+  const lab = chroma(r, g, b, "rgb").lab();
+  return { L: lab[0], a: lab[1], b: lab[2] };
+}
+
+/**
+ * Convertir LAB a LCH (Cylindrical de LAB)
+ * Útil para entender matiz y croma
+ */
+export function labToLch(L: number, a: number, b: number): { L: number; C: number; H: number } {
+  const lch = chroma.lab(L, a, b).lch();
+  return { L: lch[0], C: lch[1], H: isNaN(lch[2]) ? 0 : lch[2] };
+}
+
+// ============================================
+// MODELO KUBELKA-MUNK (Single-Constant)
+// ============================================
+
+/**
+ * Convertir reflectancia a K/S (Kubelka-Munk forward)
+ * K/S = (1-R)² / (2R)
+ * 
+ * @param R - Reflectancia difusa (0-1)
+ * @returns K/S ratio (absorption/scattering)
+ */
+export function ksFromReflectance(R: number): number {
+  const Rc = Math.max(0.001, Math.min(1, R)); // Clamp para evitar división por cero
+  return Math.pow(1 - Rc, 2) / (2 * Rc);
+}
+
+/**
+ * Convertir K/S a reflectancia (Kubelka-Munk inverse)
+ * R = 1 + (K/S) - √((K/S)² + 2(K/S))
+ * 
+ * @param KS - Ratio K/S
+ * @returns Reflectancia difusa (0-1)
+ */
+export function reflectanceFromKs(KS: number): number {
+  const ks = Math.max(0, KS);
+  return 1 + ks - Math.sqrt(ks * ks + 2 * ks);
+}
+
+/**
+ * Convertir LAB a reflectancia aproximada (para Kubelka-Munk)
+ * Usa la relación entre L* y reflectancia Y (CIE)
+ */
+export function labToReflectance(L: number): number {
+  // L* = 116 * f(Y/Yn) - 16
+  // Para Y/Yn > 0.008856: f(t) = t^(1/3)
+  // Para Y/Yn <= 0.008856: f(t) = 7.787 * t + 16/116
+  const fy = (L + 16) / 116;
+  let Y: number;
+  if (fy > 0.2069) {
+    Y = fy * fy * fy;
+  } else {
+    Y = (fy - 16 / 116) / 7.787;
+  }
+  return Math.max(0.001, Math.min(1, Y)); // Yn = 1 para iluminante D65
+}
+
+/**
+ * Convertir reflectancia a L* aproximado
+ */
+export function reflectanceToLab(R: number): LABColor {
+  // Simplificación: usar chroma-js para la conversión completa
+  // La reflectancia Y se relaciona con L* directamente
+  const Y = Math.max(0.001, Math.min(1, R));
+  let L: number;
+  if (Y > 0.008856) {
+    L = 116 * Math.pow(Y, 1 / 3) - 16;
+  } else {
+    L = 903.3 * Y;
+  }
+  return { L, a: 0, b: 0 };
+}
+
+/**
+ * Estimar K/S espectral simplificado para una tinta a partir de su LAB
+ * Modelo de 3 canales (RGB) para simplificar el cálculo
+ */
+function tintaToKs(tinta: TintaBase): { ksR: number; ksG: number; ksB: number } {
+  // Convertir LAB de la tinta a reflectancia por canal
+  const rgb = labToRgb(tinta.lab.L, tinta.lab.a, tinta.lab.b);
+  const rReflect = rgb.r / 255;
+  const gReflect = rgb.g / 255;
+  const bReflect = rgb.b / 255;
+
+  // K/S por canal (mayor absorción = mayor K/S)
+  const ksR = ksFromReflectance(Math.max(0.01, rReflect)) * tinta.tintingStrength;
+  const ksG = ksFromReflectance(Math.max(0.01, gReflect)) * tinta.tintingStrength;
+  const ksB = ksFromReflectance(Math.max(0.01, bReflect)) * tinta.tintingStrength;
+
+  return { ksR, ksG, ksB };
+}
+
+// ============================================
+// FORMULACIÓN CON KUBELKA-MUNK
+// ============================================
+
+/**
+ * Calcular LAB resultante de una mezcla usando Kubelka-Munk
+ * 
+ * Modelo:
+ * 1. Convertir sustrato a K/S base (3 canales)
+ * 2. Para cada tinta: calcular K/S por unidad de concentración
+ * 3. Sumar: (K/S)mix = (K/S)sub + Σ ci * (K/S)tinta_i
+ * 4. Convertir K/S resultante a reflectancia
+ * 5. Aplicar corrección por sustrato (opacidad, absorción)
+ * 6. Convertir reflectancia a LAB
+ */
 export function calcularLABMezcla(
   insumos: FormulacionInsumo[],
   tintas: TintaBase[],
   sustrato: Sustrato
-): { L: number; a: number; b: number } {
-  let totalWeight = 0;
-  let sumL = 0, sumA = 0, sumB = 0;
+): LABColor {
+  // 1. K/S del sustrato (base)
+  const substrateReflectance = labToReflectance(sustrato.whitePoint.L);
+  const ksSubR = ksFromReflectance(Math.max(0.01, substrateReflectance * 0.95));
+  const ksSubG = ksFromReflectance(Math.max(0.01, substrateReflectance * 0.98));
+  const ksSubB = ksFromReflectance(Math.max(0.01, substrateReflectance * 0.92));
+
+  // 2. Sumar contribución de cada tinta
+  let totalKsR = ksSubR;
+  let totalKsG = ksSubG;
+  let totalKsB = ksSubB;
+
+  const totalGramos = insumos.reduce((s, inp) => s + inp.gramos, 0);
 
   for (const insumo of insumos) {
-    const tinta = tintas.find(t => t.id === insumo.tintaId);
-    if (!tinta) continue;
+    const tinta = tintas.find((t: TintaBase) => t.id === insumo.tintaId);
+    if (!tinta || tinta.tintingStrength === 0) continue;
 
-    const weight = insumo.gramos;
-    totalWeight += weight;
+    // Concentración en fracción (0-1)
+    const concentration = insumo.gramos / 100; // Porcentaje como fracción
 
-    // Contribución de cada tinta basada en su fuerza tintórea y concentración
-    const strength = tinta.tintingStrength;
-    const concentration = insumo.gramos / 100; // Normalizado
+    // K/S de la tinta por unidad de concentración
+    const tintaKs = tintaToKs(tinta);
 
-    // Modelo Kubelka-Munk simplificado para mezcla sustractiva
-    // La contribución es proporcional a la concentración y fuerza tintórea
-    const factor = weight * strength * (1 + concentration * 0.5);
+    // Contribución = concentración × K/S por unidad
+    // Factor de corrección por opacidad de la tinta
+    const opacityFactor = 0.5 + 0.5 * tinta.opacity;
 
-    sumL += tinta.lab.L * factor;
-    sumA += tinta.lab.a * factor;
-    sumB += tinta.lab.b * factor;
+    totalKsR += concentration * tintaKs.ksR * opacityFactor;
+    totalKsG += concentration * tintaKs.ksG * opacityFactor;
+    totalKsB += concentration * tintaKs.ksB * opacityFactor;
   }
 
-  if (totalWeight === 0) return { L: 0, a: 0, b: 0 };
+  // 3. Aplicar factor de absorción del sustrato
+  const absorptionFactor = 1 + sustrato.inkAbsorption * 0.3;
+  totalKsR *= absorptionFactor;
+  totalKsG *= absorptionFactor;
+  totalKsB *= absorptionFactor;
 
-  // Promedio ponderado
-  let L = sumL / totalWeight;
-  let a = sumA / totalWeight;
-  let b = sumB / totalWeight;
+  // 4. Convertir K/S a reflectancia
+  const rReflect = reflectanceFromKs(totalKsR);
+  const gReflect = reflectanceFromKs(totalKsG);
+  const bReflect = reflectanceFromKs(totalKsB);
 
-  // Aplicar corrección por sustrato
-  // El sustrato influye más cuando la tinta es más transparente
+  // 5. Aplicar influencia del sustrato (mezcla con punto blanco)
   const avgOpacity = insumos.reduce((sum, inp) => {
     const tinta = tintas.find(t => t.id === inp.tintaId);
     return sum + (tinta?.opacity || 0) * inp.gramos;
-  }, 0) / totalWeight;
+  }, 0) / Math.max(1, totalGramos);
 
-  // Factor de influencia del sustrato (menos opaco = más influencia del sustrato)
-  const substrateInfluence = (1 - avgOpacity) * (1 - sustrato.opacity);
+  const substrateInfluence = (1 - avgOpacity) * (1 - sustrato.opacity) * 0.4;
 
-  // Mezcla con el punto blanco del sustrato
-  const substrateWeight = substrateInfluence * 0.3;
-  L = L * (1 - substrateWeight) + sustrato.whitePoint.L * substrateWeight;
-  a = a * (1 - substrateWeight) + sustrato.whitePoint.a * substrateWeight;
-  b = b * (1 - substrateWeight) + sustrato.whitePoint.b * substrateWeight;
+  // Mezcla con sustrato
+  const finalR = rReflect * (1 - substrateInfluence) + substrateReflectance * substrateInfluence;
+  const finalG = gReflect * (1 - substrateInfluence) + substrateReflectance * substrateInfluence * 0.98;
+  const finalB = bReflect * (1 - substrateInfluence) + substrateReflectance * substrateInfluence * 0.92;
 
-  // Aplicar correcciones del sustrato
-  L += sustrato.correctionFactors.dL * substrateInfluence;
-  a += sustrato.correctionFactors.da * substrateInfluence;
-  b += sustrato.correctionFactors.db * substrateInfluence;
+  // 6. Convertir reflectancia RGB a LAB usando chroma-js
+  const r = Math.max(0, Math.min(255, Math.round(finalR * 255)));
+  const g = Math.max(0, Math.min(255, Math.round(finalG * 255)));
+  const b = Math.max(0, Math.min(255, Math.round(finalB * 255)));
 
-  // Factor de absorción de tinta del sustrato
-  const absorptionFactor = 1 - (sustrato.inkAbsorption * 0.15);
-  L *= absorptionFactor;
+  const lab = chroma(r, g, b, "rgb").lab();
 
-  return { L, a, b };
+  // 7. Aplicar correcciones del sustrato (desviaciones conocidas)
+  const correctionFactor = Math.min(1, (1 - avgOpacity) + 0.3);
+
+  return {
+    L: lab[0] + sustrato.correctionFactors.dL * correctionFactor,
+    a: lab[1] + sustrato.correctionFactors.da * correctionFactor,
+    b: lab[2] + sustrato.correctionFactors.db * correctionFactor
+  };
 }
 
 // ============================================
 // ALGORITMO DE FORMULACIÓN AUTOMÁTICA
 // ============================================
 
+/**
+ * Seleccionar tintas relevantes basado en el color objetivo
+ * Usa análisis del espacio LCH para determinar qué tintas usar
+ */
+function seleccionarTintasRelevantes(L: number, a: number, b: number, tintas: TintaBase[]): TintaBase[] {
+  const relevantes: TintaBase[] = [];
+  const chromaVal = Math.sqrt(a * a + b * b);
+  const hue = Math.atan2(b, a) * 180 / Math.PI;
+
+  // Base: transparente o blanco según luminosidad
+  if (L > 65) {
+    relevantes.push(tintas.find(t => t.id === "blanco")!);
+  } else {
+    relevantes.push(tintas.find(t => t.id === "transparente")!);
+  }
+
+  if (chromaVal < 10) {
+    // Color neutro
+    relevantes.push(tintas.find(t => t.id === "negro")!);
+    if (L > 50) relevantes.push(tintas.find(t => t.id === "blanco")!);
+  } else {
+    // Seleccionar por hue (ángulo en espacio a-b)
+    if (hue >= -20 && hue < 30) {
+      relevantes.push(tintas.find(t => t.id === "rojo-amarillento")!);
+      if (b > 40) relevantes.push(tintas.find(t => t.id === "amarillo")!);
+      if (b > 50) relevantes.push(tintas.find(t => t.id === "naranja")!);
+    } else if (hue >= 30 && hue < 70) {
+      relevantes.push(tintas.find(t => t.id === "naranja")!);
+      relevantes.push(tintas.find(t => t.id === "amarillo")!);
+    } else if (hue >= 70 && hue < 110) {
+      relevantes.push(tintas.find(t => t.id === "amarillo")!);
+      if (a < 0) relevantes.push(tintas.find(t => t.id === "amarillo-verdoso")!);
+    } else if (hue >= 110 && hue < 160) {
+      relevantes.push(tintas.find(t => t.id === "verde")!);
+      relevantes.push(tintas.find(t => t.id === "amarillo-verdoso")!);
+    } else if (hue >= 160 || hue < -160) {
+      relevantes.push(tintas.find(t => t.id === "verde")!);
+      relevantes.push(tintas.find(t => t.id === "azul-verdoso")!);
+    } else if (hue >= -160 && hue < -110) {
+      relevantes.push(tintas.find(t => t.id === "azul-verdoso")!);
+      relevantes.push(tintas.find(t => t.id === "azul")!);
+    } else if (hue >= -110 && hue < -60) {
+      relevantes.push(tintas.find(t => t.id === "azul")!);
+      if (b < -30) relevantes.push(tintas.find(t => t.id === "violeta")!);
+    } else if (hue >= -60 && hue < -20) {
+      relevantes.push(tintas.find(t => t.id === "magenta")!);
+      relevantes.push(tintas.find(t => t.id === "violeta")!);
+    } else {
+      relevantes.push(tintas.find(t => t.id === "rojo")!);
+      relevantes.push(tintas.find(t => t.id === "magenta")!);
+    }
+
+    // Añadir negro si luminosidad baja
+    if (L < 40) {
+      relevantes.push(tintas.find(t => t.id === "negro")!);
+    }
+  }
+
+  // Eliminar duplicados y nulos
+  const uniqueIds = [...new Set(relevantes.map(t => t.id))];
+  return uniqueIds.map(id => tintas.find(t => t.id === id)!).filter(Boolean);
+}
+
+/**
+ * Formular color automáticamente usando optimización iterativa
+ * con modelo Kubelka-Munk real
+ */
 export function formularColor(
   targetL: number, targetA: number, targetB: number,
   tintas: TintaBase[],
   sustrato: Sustrato,
   totalGramos: number = 100
 ): Formulacion {
-  // Algoritmo iterativo de búsqueda de formulación
-  // Basado en optimización por gradiente descendente simplificado
-
-  // Seleccionar tintas relevantes basado en el color objetivo
+  const target: LABColor = { L: targetL, a: targetA, b: targetB };
   const tintasRelevantes = seleccionarTintasRelevantes(targetL, targetA, targetB, tintas);
 
-  // Inicializar proporciones
+  // Inicializar proporciones iguales
   let insumos: FormulacionInsumo[] = tintasRelevantes.map(t => ({
     tintaId: t.id,
     tintaName: t.name,
@@ -229,41 +447,44 @@ export function formularColor(
     porcentaje: 100 / tintasRelevantes.length
   }));
 
-  // Iterar para optimizar
-  const learningRate = 0.02;
-  const maxIterations = 500;
+  // Optimización por descenso de gradiente numérico
+  const stepSize = totalGramos * 0.02;
+  const maxIterations = 300;
+  let bestDeltaE = Infinity;
 
   for (let iter = 0; iter < maxIterations; iter++) {
     const currentLAB = calcularLABMezcla(insumos, tintas, sustrato);
-    const currentDeltaE = deltaE2000(currentLAB.L, currentLAB.a, currentLAB.b, targetL, targetA, targetB);
+    const currentDeltaE = getDeltaE00(currentLAB, target);
+
+    if (currentDeltaE < bestDeltaE) {
+      bestDeltaE = currentDeltaE;
+    }
 
     if (currentDeltaE < 0.3) break; // Suficientemente cerca
 
-    // Calcular gradientes aproximados
+    // Para cada tinta, probar variación y quedarse con la mejor
     for (let i = 0; i < insumos.length; i++) {
-      const delta = totalGramos * 0.01; // 1% de variación
+      // Probar +step
+      const testPlus = [...insumos];
+      testPlus[i] = { ...testPlus[i], gramos: testPlus[i].gramos + stepSize };
+      const labPlus = calcularLABMezcla(testPlus, tintas, sustrato);
+      const dEPlus = getDeltaE00(labPlus, target);
 
-      // Probar variación positiva
-      const testInsumos = [...insumos];
-      testInsumos[i] = { ...testInsumos[i], gramos: testInsumos[i].gramos + delta };
-      const testLAB = calcularLABMezcla(testInsumos, tintas, sustrato);
-      const testDeltaE = deltaE2000(testLAB.L, testLAB.a, testLAB.b, targetL, targetA, targetB);
+      // Probar -step
+      const testMinus = [...insumos];
+      testMinus[i] = { ...testMinus[i], gramos: Math.max(0.01, testMinus[i].gramos - stepSize) };
+      const labMinus = calcularLABMezcla(testMinus, tintas, sustrato);
+      const dEMinus = getDeltaE00(labMinus, target);
 
-      // Probar variación negativa
-      const testInsumos2 = [...insumos];
-      testInsumos2[i] = { ...testInsumos2[i], gramos: Math.max(0.1, testInsumos2[i].gramos - delta) };
-      const testLAB2 = calcularLABMezcla(testInsumos2, tintas, sustrato);
-      const testDeltaE2 = deltaE2000(testLAB2.L, testLAB2.a, testLAB2.b, targetL, targetA, targetB);
-
-      // Actualizar basado en el mejor resultado
-      if (testDeltaE < currentDeltaE) {
-        insumos[i] = { ...insumos[i], gramos: insumos[i].gramos + delta * learningRate * 10 };
-      } else if (testDeltaE2 < currentDeltaE) {
-        insumos[i] = { ...insumos[i], gramos: Math.max(0.1, insumos[i].gramos - delta * learningRate * 10) };
+      // Actualizar si mejora
+      if (dEPlus < currentDeltaE && dEPlus <= dEMinus) {
+        insumos[i] = { ...insumos[i], gramos: insumos[i].gramos + stepSize * 0.5 };
+      } else if (dEMinus < currentDeltaE) {
+        insumos[i] = { ...insumos[i], gramos: Math.max(0.01, insumos[i].gramos - stepSize * 0.5) };
       }
     }
 
-    // Normalizar a totalGramos
+    // Normalizar al total de gramos
     const total = insumos.reduce((s, inp) => s + inp.gramos, 0);
     insumos = insumos.map(inp => ({
       ...inp,
@@ -279,7 +500,7 @@ export function formularColor(
     porcentaje: Math.round((inp.gramos / total) * 10000) / 100
   }));
 
-  // Eliminar tintas con porcentaje insignificante
+  // Eliminar tintas insignificantes
   insumos = insumos.filter(inp => inp.porcentaje >= 0.5);
 
   // Recalcular porcentajes
@@ -290,7 +511,7 @@ export function formularColor(
   }));
 
   const labEstimado = calcularLABMezcla(insumos, tintas, sustrato);
-  const deltaE = deltaE2000(labEstimado.L, labEstimado.a, labEstimado.b, targetL, targetA, targetB);
+  const deltaE = getDeltaE00(labEstimado, target);
 
   return {
     insumos,
@@ -299,68 +520,6 @@ export function formularColor(
     deltaE: Math.round(deltaE * 100) / 100,
     sustratoId: sustrato.id
   };
-}
-
-// Selecciona las tintas más relevantes para un color objetivo
-function seleccionarTintasRelevantes(L: number, a: number, b: number, tintas: TintaBase[]): TintaBase[] {
-  const relevantes: TintaBase[] = [];
-
-  // Siempre incluir base transparente o blanco según luminosidad
-  if (L > 70) {
-    relevantes.push(tintas.find(t => t.id === "blanco")!);
-  } else {
-    relevantes.push(tintas.find(t => t.id === "transparente")!);
-  }
-
-  // Seleccionar tintas cromáticas basadas en el eje a-b
-  const angle = Math.atan2(b, a) * 180 / Math.PI;
-  const chroma = Math.sqrt(a * a + b * b);
-
-  if (chroma < 15) {
-    // Color muy neutro - usar negro + blanco
-    relevantes.push(tintas.find(t => t.id === "negro")!);
-    if (L > 50) relevantes.push(tintas.find(t => t.id === "blanco")!);
-  } else {
-    // Seleccionar por posición en el círculo cromático
-    if (angle >= -30 && angle < 30) {
-      relevantes.push(tintas.find(t => t.id === "rojo-amarillento")!);
-      if (b > 30) relevantes.push(tintas.find(t => t.id === "amarillo")!);
-      if (b > 50) relevantes.push(tintas.find(t => t.id === "naranja")!);
-    } else if (angle >= 30 && angle < 80) {
-      relevantes.push(tintas.find(t => t.id === "naranja")!);
-      relevantes.push(tintas.find(t => t.id === "amarillo")!);
-    } else if (angle >= 80 && angle < 120) {
-      relevantes.push(tintas.find(t => t.id === "amarillo")!);
-      if (a < -5) relevantes.push(tintas.find(t => t.id === "amarillo-verdoso")!);
-    } else if (angle >= 120 && angle < 170) {
-      relevantes.push(tintas.find(t => t.id === "verde")!);
-      relevantes.push(tintas.find(t => t.id === "amarillo-verdoso")!);
-    } else if (angle >= 170 || angle < -170) {
-      relevantes.push(tintas.find(t => t.id === "verde")!);
-      relevantes.push(tintas.find(t => t.id === "azul-verdoso")!);
-    } else if (angle >= -170 && angle < -120) {
-      relevantes.push(tintas.find(t => t.id === "azul-verdoso")!);
-      relevantes.push(tintas.find(t => t.id === "azul")!);
-    } else if (angle >= -120 && angle < -60) {
-      relevantes.push(tintas.find(t => t.id === "azul")!);
-      if (b < -40) relevantes.push(tintas.find(t => t.id === "violeta")!);
-    } else if (angle >= -60 && angle < -30) {
-      relevantes.push(tintas.find(t => t.id === "violeta")!);
-      relevantes.push(tintas.find(t => t.id === "magenta")!);
-    } else {
-      relevantes.push(tintas.find(t => t.id === "rojo")!);
-      relevantes.push(tintas.find(t => t.id === "magenta")!);
-    }
-
-    // Añadir negro si la luminosidad es baja
-    if (L < 40) {
-      relevantes.push(tintas.find(t => t.id === "negro")!);
-    }
-  }
-
-  // Asegurar que no hay duplicados y que todas existen
-  const uniqueIds = [...new Set(relevantes.map(t => t.id))];
-  return uniqueIds.map(id => tintas.find(t => t.id === id)!).filter(Boolean);
 }
 
 // ============================================
@@ -383,85 +542,4 @@ export function escalarFormulacion(
     insumos,
     totalGramos: Math.round(gramosObjetivo * 100) / 100
   };
-}
-
-// ============================================
-// AJUSTE MANUAL DE FORMULACIÓN
-// ============================================
-
-export function ajustarFormulacion(
-  formulacion: Formulacion,
-  ajustes: { [tintaId: string]: number }, // gramos de ajuste (+/-)
-  tintas: TintaBase[],
-  sustrato: Sustrato
-): Formulacion {
-  const insumos = formulacion.insumos.map(inp => {
-    const ajuste = ajustes[inp.tintaId] || 0;
-    return {
-      ...inp,
-      gramos: Math.max(0, Math.round((inp.gramos + ajuste) * 100) / 100)
-    };
-  }).filter(inp => inp.gramos > 0);
-
-  const total = insumos.reduce((s, inp) => s + inp.gramos, 0);
-  const insumosFinal = insumos.map(inp => ({
-    ...inp,
-    porcentaje: Math.round((inp.gramos / total) * 10000) / 100
-  }));
-
-  const labEstimado = calcularLABMezcla(insumosFinal, tintas, sustrato);
-  const deltaE = deltaE2000(labEstimado.L, labEstimado.a, labEstimado.b,
-    formulacion.labEstimado.L, formulacion.labEstimado.a, formulacion.labEstimado.b);
-
-  return {
-    ...formulacion,
-    insumos: insumosFinal,
-    totalGramos: Math.round(total * 100) / 100,
-    labEstimado,
-    deltaE: Math.round(deltaE * 100) / 100
-  };
-}
-
-// ============================================
-// CONVERSIÓN LAB A RGB (para visualización)
-// ============================================
-
-export function labToRgb(L: number, a: number, b: number): { r: number; g: number; b: number } {
-  // LAB -> XYZ (D50)
-  const fy = (L + 16) / 116;
-  const fx = a / 500 + fy;
-  const fz = fy - b / 200;
-
-  const delta = 6 / 29;
-  const x = fx > delta ? fx * fx * fx : 3 * delta * delta * (fx - 4 / 29);
-  const y = fy > delta ? fy * fy * fy : 3 * delta * delta * (fy - 4 / 29);
-  const z = fz > delta ? fz * fz * fz : 3 * delta * delta * (fz - 4 / 29);
-
-  // XYZ D50 -> XYZ D65
-  const X = x * 0.9642;
-  const Y = y * 1.0000;
-  const Z = z * 0.8251;
-
-  // XYZ -> RGB (sRGB)
-  let r = X * 3.2406 + Y * -1.5372 + Z * -0.4986;
-  let g = X * -0.9689 + Y * 1.8758 + Z * 0.0415;
-  let bVal = X * 0.0557 + Y * -0.2040 + Z * 1.0570;
-
-  // Gamma correction
-  const gamma = (c: number) => c > 0.0031308 ? 1.055 * Math.pow(c, 1 / 2.4) - 0.055 : 12.92 * c;
-
-  r = Math.max(0, Math.min(255, Math.round(gamma(r) * 255)));
-  g = Math.max(0, Math.min(255, Math.round(gamma(g) * 255)));
-  bVal = Math.max(0, Math.min(255, Math.round(gamma(bVal) * 255)));
-
-  return { r, g, b: bVal };
-}
-
-export function rgbToHex(r: number, g: number, b: number): string {
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-}
-
-export function labToHex(L: number, a: number, b: number): string {
-  const rgb = labToRgb(L, a, b);
-  return rgbToHex(rgb.r, rgb.g, rgb.b);
 }
