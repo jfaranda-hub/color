@@ -2,8 +2,10 @@
  * Motor de cálculo de color para formulación flexográfica
  * 
  * Librerías utilizadas:
- * - delta-e: Implementación CIE oficial de Delta E (CIE76, CIE94, CIEDE2000)
  * - chroma-js: Conversiones entre espacios de color (LAB, RGB, XYZ, LCH)
+ * 
+ * Implementaciones propias:
+ * - Delta E CIE76, CIE94, CIEDE2000 (según CIE Publication 15:2004)
  * 
  * Modelo de mezcla:
  * - Kubelka-Munk (single-constant): Modelo físico real para mezcla sustractiva
@@ -16,7 +18,6 @@
  * - Shore, A.R. (1996). "The Kubelka-Munk Theory"
  */
 
-import * as DeltaE from "delta-e";
 import chroma from "chroma-js";
 import { TintaBase } from "../data/tintasBase";
 import { Sustrato } from "../data/sustratos";
@@ -47,40 +48,147 @@ export interface Formulacion {
 }
 
 // ============================================
-// DELTA E - Usando librería delta-e (implementación CIE oficial)
+// DELTA E - Implementaciones CIE oficiales
 // ============================================
 
 /**
  * Delta E CIE76 (1976) - Distancia euclidiana en espacio LAB
  * Simple pero no perceptualmente uniforme
+ * Fórmula: ΔE = √[(L1-L2)² + (a1-a2)² + (b1-b2)²]
  */
 export function getDeltaE76(lab1: LABColor, lab2: LABColor): number {
-  return DeltaE.getDeltaE76(
-    { L: lab1.L, A: lab1.a, B: lab1.b },
-    { L: lab2.L, A: lab2.a, B: lab2.b }
-  );
+  const dL = lab1.L - lab2.L;
+  const da = lab1.a - lab2.a;
+  const db = lab1.b - lab2.b;
+  return Math.sqrt(dL * dL + da * da + db * db);
 }
 
 /**
  * Delta E CIE94 (1994) - Mejora con factores de ponderación
- * Usado en industria textil
+ * Usado en industria textil y gráficos
+ * 
+ * @param lab1 - Primer color LAB
+ * @param lab2 - Segundo color LAB
+ * @param textiles - true para aplicaciones textiles, false para gráficos (default)
  */
-export function getDeltaE94(lab1: LABColor, lab2: LABColor): number {
-  return DeltaE.getDeltaE94(
-    { L: lab1.L, A: lab1.a, B: lab1.b },
-    { L: lab2.L, A: lab2.a, B: lab2.b }
-  );
+export function getDeltaE94(lab1: LABColor, lab2: LABColor, textiles: boolean = false): number {
+  const dL = lab1.L - lab2.L;
+  const da = lab1.a - lab2.a;
+  const db = lab1.b - lab2.b;
+  
+  const c1 = Math.sqrt(lab1.a * lab1.a + lab1.b * lab1.b);
+  const c2 = Math.sqrt(lab2.a * lab2.a + lab2.b * lab2.b);
+  const dc = c1 - c2;
+  
+  const dH2 = da * da + db * db - dc * dc;
+  const dH = dH2 > 0 ? Math.sqrt(dH2) : 0;
+  
+  // Factores de ponderación
+  const kL = textiles ? 2 : 1;
+  const k1 = textiles ? 0.048 : 0.045;
+  const k2 = textiles ? 0.014 : 0.015;
+  
+  const sL = 1;
+  const sC = 1 + k1 * c1;
+  const sH = 1 + k2 * c1;
+  
+  const term1 = dL / (kL * sL);
+  const term2 = dc / sC;
+  const term3 = dH / sH;
+  
+  return Math.sqrt(term1 * term1 + term2 * term2 + term3 * term3);
 }
 
 /**
  * Delta E CIEDE2000 (2000) - Estándar actual
  * Correcciones para no-uniformidad en azules y neutros
  * Usado en control de calidad de impresión
+ * 
+ * Implementación según CIE Publication 15:2004
+ * 
+ * @param lab1 - Primer color LAB
+ * @param lab2 - Segundo color LAB
  */
 export function getDeltaE00(lab1: LABColor, lab2: LABColor): number {
-  return DeltaE.getDeltaE00(
-    { L: lab1.L, A: lab1.a, B: lab1.b },
-    { L: lab2.L, A: lab2.a, B: lab2.b }
+  // Paso 1: Calcular C'ab y h'ab
+  const C1 = Math.sqrt(lab1.a * lab1.a + lab1.b * lab1.b);
+  const C2 = Math.sqrt(lab2.a * lab2.a + lab2.b * lab2.b);
+  const Cab = (C1 + C2) / 2;
+  
+  const Cab7 = Math.pow(Cab, 7);
+  const G = 0.5 * (1 - Math.sqrt(Cab7 / (Cab7 + Math.pow(25, 7))));
+  
+  const a1p = lab1.a * (1 + G);
+  const a2p = lab2.a * (1 + G);
+  
+  const C1p = Math.sqrt(a1p * a1p + lab1.b * lab1.b);
+  const C2p = Math.sqrt(a2p * a2p + lab2.b * lab2.b);
+  
+  let h1p = Math.atan2(lab1.b, a1p) * 180 / Math.PI;
+  if (h1p < 0) h1p += 360;
+  
+  let h2p = Math.atan2(lab2.b, a2p) * 180 / Math.PI;
+  if (h2p < 0) h2p += 360;
+  
+  // Paso 2: Calcular diferencias
+  const dLp = lab2.L - lab1.L;
+  const dCp = C2p - C1p;
+  
+  let dhp: number;
+  if (C1p * C2p === 0) {
+    dhp = 0;
+  } else if (Math.abs(h2p - h1p) <= 180) {
+    dhp = h2p - h1p;
+  } else if (h2p - h1p > 180) {
+    dhp = h2p - h1p - 360;
+  } else {
+    dhp = h2p - h1p + 360;
+  }
+  
+  const dHp = 2 * Math.sqrt(C1p * C2p) * Math.sin(dhp * Math.PI / 360);
+  
+  // Paso 3: Calcular CIEDE2000
+  const Lp = (lab1.L + lab2.L) / 2;
+  const Cp = (C1p + C2p) / 2;
+  
+  let hp: number;
+  if (C1p * C2p === 0) {
+    hp = h1p + h2p;
+  } else if (Math.abs(h1p - h2p) <= 180) {
+    hp = (h1p + h2p) / 2;
+  } else if (h1p + h2p < 360) {
+    hp = (h1p + h2p + 360) / 2;
+  } else {
+    hp = (h1p + h2p - 360) / 2;
+  }
+  
+  const T = 1 
+    - 0.17 * Math.cos((hp - 30) * Math.PI / 180)
+    + 0.24 * Math.cos(2 * hp * Math.PI / 180)
+    + 0.32 * Math.cos((3 * hp + 6) * Math.PI / 180)
+    - 0.20 * Math.cos((4 * hp - 63) * Math.PI / 180);
+  
+  const SL = 1 + (0.015 * Math.pow(Lp - 50, 2)) / Math.sqrt(20 + Math.pow(Lp - 50, 2));
+  const SC = 1 + 0.045 * Cp;
+  const SH = 1 + 0.015 * Cp * T;
+  
+  const Cp7 = Math.pow(Cp, 7);
+  const RT = -2 * Math.sqrt(Cp7 / (Cp7 + Math.pow(25, 7)))
+    * Math.sin(60 * Math.exp(-Math.pow((hp - 275) / 25, 2)) * Math.PI / 180);
+  
+  const kL = 1;
+  const kC = 1;
+  const kH = 1;
+  
+  const term1 = dLp / (kL * SL);
+  const term2 = dCp / (kC * SC);
+  const term3 = dHp / (kH * SH);
+  
+  return Math.sqrt(
+    term1 * term1 + 
+    term2 * term2 + 
+    term3 * term3 + 
+    RT * term2 * term3
   );
 }
 
