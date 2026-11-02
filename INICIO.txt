@@ -1,0 +1,187 @@
+╔════════════════════════════════════════════════════════════════╗
+║                                                                ║
+║              🎨 FLEXCOLOR PRO - EJECUTABLE 🎨                 ║
+║                                                                ║
+║         Aplicación de Formulación de Color Flexográfica       ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📌 INSTRUCCIONES RÁPIDAS
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🪟 WINDOWS:
+   → Doble clic en: iniciar-windows.bat
+   → Espera 10-30 segundos
+   → ¡Listo! Se abre el navegador automáticamente
+
+🐧 LINUX / MAC:
+   → Abre terminal en esta carpeta
+   → Ejecuta: ./iniciar-linux-mac.sh
+   → ¡Listo! Se abre el navegador automáticamente
+
+🌐 UNIVERSAL (todas las plataformas):
+   → Abre terminal en esta carpeta
+   → Ejecuta: node iniciar.js
+   → ¡Listo! Se abre el navegador automáticamente
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 REQUISITOS
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Node.js instalado (versión 18 o superior)
+   → Descarga: https://nodejs.org/
+   → Verifica: node --version
+
+✅ Navegador web moderno (Chrome, Firefox, Edge, Safari)
+
+✅ Conexión a internet (solo primera vez)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 PRIMEROS PASOS
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ IMPORTAR COLORES PANTONE (opcional pero recomendado)
+   → Abre la app en el navegador
+   → Ve a pestaña "Pantone DB"
+   → Clic en "✨ Importar 50 colores Pantone de ejemplo"
+
+2️⃣ FORMULAR TU PRIMER COLOR
+   → Pestaña "Formulación"
+   → Selecciona familia de tinta
+   → Elige Pantone objetivo
+   → Selecciona sustrato
+   → Clic en "Calcular Formulación (100g)"
+
+3️⃣ MEDIR Y AJUSTAR
+   → Prepara mezcla de 100g
+   → Mide con colorímetro
+   → Introduce valores LAB
+   → Aplica ajustes recomendados
+   → Repite hasta ΔE ≤ 2.0
+
+4️⃣ ESCALAR A PRODUCCIÓN
+   → Escala a 1000g
+   → Guarda receta maestra
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🆘 SOLUCIÓN DE PROBLEMAS
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ "Node.js no está instalado"
+   → Instala desde: https://nodejs.org/
+
+❌ "Error al instalar dependencias"
+   → Ejecuta: rm -rf node_modules package-lock.json && npm install
+
+❌ "Puerto 5173 en uso"
+   → Windows: taskkill /F /IM node.exe
+   → Linux/Mac: pkill -f node
+
+❌ "La app no se abre"
+   → Abre manualmente: http://localhost:5173
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 DOCUMENTACIÓN
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📘 COMENZAR AHORA    → Lee: COMO_USAR.md
+📗 GUÍA RÁPIDA       → Lee: INICIO_RAPIDO.md
+📙 GUÍA COMPLETA     → Lee: GUIA_USO.md
+📕 DOCUMENTACIÓN     → Lee: README.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✨ CARACTERÍSTICAS PRINCIPALES
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Formulación de colores Pantone con precisión industrial
+✅ Loop de corrección automática con ΔE*00
+✅ Base de datos con 3,219+ colores Pantone
+✅ Modelo Kubelka-Munk para mezcla sustractiva
+✅ Delta E CIEDE2000 - estándar de la industria
+✅ Gestión completa de tintas, anilox y sustratos
+✅ Importación CSV desde repositorios open source
+✅ Cálculo de costes y escalado a producción
+✅ Tests de validación en tiempo real
+✅ Funciona offline una vez instalada
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 ESPECIFICACIONES TÉCNICAS
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Tamaño del bundle:  ~325 KB (JS) + ~42 KB (CSS)
+Colores Pantone:    3,219+ disponibles
+Performance:        Búsquedas ~250x más rápidas con KD-Tree
+Precisión:          ΔE < 1 en conversiones RGB ↔ LAB
+Tecnologías:        React 18 + TypeScript + Vite + Tailwind CSS
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 CONSEJOS ÚTILES
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Primera vez: La instalación tarda 2-3 minutos
+✅ Datos: Todo se guarda en el navegador (no se pierde)
+✅ Offline: Funciona sin internet una vez instalada
+✅ Actualizaciones: El servidor se recarga solo al cambiar código
+✅ Soporte: Revisa la consola del navegador (F12) para errores
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 ¡LISTO PARA USAR!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Ya puedes usar FlexColor Pro para:
+
+🎨 Formular colores Pantone con precisión
+🔄 Ajustar mezclas con corrección automática
+💼 Gestionar tintas, anilox y sustratos
+💰 Calcular costes y escalar a producción
+📊 Analizar y validar resultados
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚖️ AVISO LEGAL
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Los colores Pantone mostrados son aproximaciones no oficiales
+basadas en datasets de código abierto. Para uso profesional de
+alta precisión, consulte las guías físicas oficiales de Pantone LLC.
+
+PANTONE® es una marca registrada de Pantone LLC.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📞 SOPORTE Y RECURSOS
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 Documentación completa:  README.md
+📘 Guía de inicio rápido:   INICIO_RAPIDO.md
+📗 Guía de uso detallada:   GUIA_USO.md
+🌐 Repositorio Pantone:     https://github.com/aj90909/unofficial-pantone-solid-coated-2024-v5
+🎨 Documentación CIELAB:    https://en.wikipedia.org/wiki/CIELAB_color_space
+📏 Calculadora Delta E:     https://zschuessler.github.io/DeltaE/learn/
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Hecho con ❤️ para la industria de impresión flexográfica
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
