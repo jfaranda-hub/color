@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import Papa from "papaparse";
 import {
   Formulacion,
   getDeltaE00,
@@ -6,11 +7,12 @@ import {
   labToHex,
   escalarFormulacion,
   evaluateDeltaE,
+  calcularAjusteAutomatico,
   LABColor
 } from "../utils/colorCalculations";
 import { tintasBase } from "../data/tintasBase";
 import { Sustrato } from "../data/sustratos";
-import { Gauge, Plus, Minus, RotateCcw, ArrowUpCircle, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Gauge, Plus, Minus, RotateCcw, ArrowUpCircle, CheckCircle2, AlertTriangle, FileText, Keyboard, Save } from "lucide-react";
 
 interface Props {
   formulacion: Formulacion;
@@ -20,29 +22,159 @@ interface Props {
   onUpdate: (f: Formulacion) => void;
 }
 
+type MetodoEntrada = 'manual' | 'csv';
+
 export default function IteracionPanel({ formulacion, sustrato, targetLAB, toleranciaDeltaE, onUpdate }: Props) {
+  const [metodoEntrada, setMetodoEntrada] = useState<MetodoEntrada>('manual');
   const [medicionLAB, setMedicionLAB] = useState<LABColor>({ L: 0, a: 0, b: 0 });
-  const [hasMedicion, setHasMedicion] = useState(false);
+  const [historialMedidas, setHistorialMedidas] = useState<Array<{
+    iteracion: number;
+    labMedido: LABColor;
+    deltaE: number;
+    timestamp: string;
+  }>>([]);
+  const [iteracionActual, setIteracionActual] = useState(0);
+  const MAX_ITERACIONES = 5;
+  const [ajusteRecomendado, setAjusteRecomendado] = useState<ReturnType<typeof calcularAjusteAutomatico> | null>(null);
+  const [aprobado, setAprobado] = useState(false);
   const [escalaGramos, setEscalaGramos] = useState(1000);
+  const [showManualAdjust, setShowManualAdjust] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const medicionDeltaE = hasMedicion
-    ? getDeltaE00(medicionLAB, targetLAB)
-    : 0;
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  const evaluation = evaluateDeltaE(medicionDeltaE);
+    Papa.parse(file, {
+      complete: (results) => {
+        const data = results.data as any[];
+        if (data.length > 0) {
+          // Buscar la última fila con datos válidos
+          let lastValidRow = null;
+          for (let i = data.length - 1; i >= 0; i--) {
+            const row = data[i];
+            if (row && row.length >= 3) {
+              // Intentar encontrar columnas L, a, b (pueden estar en diferentes posiciones)
+              const L = parseFloat(row[0]);
+              const a = parseFloat(row[1]);
+              const b = parseFloat(row[2]);
+              
+              if (!isNaN(L) && !isNaN(a) && !isNaN(b) && L > 0 && L <= 100) {
+                lastValidRow = { L, a, b };
+                break;
+              }
+            }
+          }
 
-  const handleMedir = () => {
-    if (medicionLAB.L > 0 || medicionLAB.a !== 0 || medicionLAB.b !== 0) {
-      setHasMedicion(true);
+          if (lastValidRow) {
+            setMedicionLAB(lastValidRow);
+          } else {
+            alert("No se encontraron datos LAB válidos en el CSV. Asegúrate de que el archivo tenga columnas L, a, b.");
+          }
+        }
+      },
+      error: (error) => {
+        alert(`Error al leer el CSV: ${error.message}`);
+      }
+    });
+  };
+
+  const handleRegistrarMedida = () => {
+    if (medicionLAB.L === 0 && medicionLAB.a === 0 && medicionLAB.b === 0) {
+      alert("Por favor, introduce o carga los valores LAB antes de registrar.");
+      return;
+    }
+
+    const deltaE = getDeltaE00(medicionLAB, targetLAB);
+    
+    // Añadir al historial
+    const nuevaMedida = {
+      iteracion: iteracionActual + 1,
+      labMedido: { ...medicionLAB },
+      deltaE: Math.round(deltaE * 100) / 100,
+      timestamp: new Date().toLocaleTimeString()
+    };
+    
+    setHistorialMedidas([...historialMedidas, nuevaMedida]);
+    setIteracionActual(iteracionActual + 1);
+
+    // Verificar si está dentro de tolerancia
+    if (deltaE <= toleranciaDeltaE) {
+      setAprobado(true);
+      setAjusteRecomendado(null);
+      setShowManualAdjust(false);
+    } else {
+      // Calcular ajuste automático recomendado
+      const ajuste = calcularAjusteAutomatico(
+        medicionLAB,
+        targetLAB,
+        formulacion.insumos,
+        tintasBase,
+        sustrato
+      );
+      setAjusteRecomendado(ajuste);
+      setAprobado(false);
+    }
+
+    // Resetear input
+    setMedicionLAB({ L: 0, a: 0, b: 0 });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
-  const handleReset = () => {
-    setMedicionLAB({ L: 0, a: 0, b: 0 });
-    setHasMedicion(false);
+  const handleAplicarAjuste = () => {
+    if (!ajusteRecomendado) return;
+
+    // Actualizar formulación añadiendo los gramos recomendados
+    const insumosActualizados = formulacion.insumos.map(inp => {
+      if (inp.tintaId === ajusteRecomendado.tintaId) {
+        return {
+          ...inp,
+          gramos: Math.round((inp.gramos + ajusteRecomendado.gramosAñadir) * 100) / 100
+        };
+      }
+      return inp;
+    });
+
+    // Verificar si la tinta ya existía, si no, añadirla
+    const tintaExiste = insumosActualizados.some(inp => inp.tintaId === ajusteRecomendado.tintaId);
+    if (!tintaExiste) {
+      insumosActualizados.push({
+        tintaId: ajusteRecomendado.tintaId,
+        tintaName: ajusteRecomendado.tintaName,
+        gramos: ajusteRecomendado.gramosAñadir,
+        porcentaje: 0
+      });
+    }
+
+    // Recalcular porcentajes
+    const totalGramos = insumosActualizados.reduce((sum, inp) => sum + inp.gramos, 0);
+    const insumosFinales = insumosActualizados.map(inp => ({
+      ...inp,
+      porcentaje: Math.round((inp.gramos / totalGramos) * 10000) / 100
+    }));
+
+    // Recalcular LAB estimado
+    const labEstimado = calcularLABMezcla(insumosFinales, tintasBase, sustrato);
+    const deltaE = getDeltaE00(labEstimado, targetLAB);
+
+    // Actualizar formulación
+    onUpdate({
+      ...formulacion,
+      insumos: insumosFinales,
+      totalGramos: Math.round(totalGramos * 100) / 100,
+      labEstimado,
+      deltaE: Math.round(deltaE * 100) / 100
+    });
+
+    // Limpiar ajuste recomendado
+    setAjusteRecomendado(null);
+    setShowManualAdjust(false);
   };
 
-  const handleAjuste = (tintaId: string, delta: number) => {
+  const handleAjusteManual = (tintaId: string, delta: number) => {
     const insumos = formulacion.insumos.map(inp => {
       if (inp.tintaId === tintaId) {
         return { ...inp, gramos: Math.max(0, Math.round((inp.gramos + delta) * 100) / 100) };
@@ -73,127 +205,245 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, toler
     onUpdate(escalada);
   };
 
-  const isDeltaAcceptable = medicionDeltaE <= toleranciaDeltaE;
+  const handleGuardarReceta = () => {
+    const costeTotal = formulacion.insumos.reduce((total, inp) => {
+      const tinta = tintasBase.find(t => t.id === inp.tintaId);
+      if (!tinta) return total;
+      const factorEscala = escalaGramos / formulacion.totalGramos;
+      const gramosEscalados = inp.gramos * factorEscala;
+      const coste = (gramosEscalados / 1000) * tinta.costPerKg;
+      return total + coste;
+    }, 0);
+
+    const recetaMaestra = {
+      color: targetLAB,
+      sustrato: sustrato.name,
+      recetaFinal: formulacion,
+      historialIteraciones: historialMedidas,
+      costeTotal: Math.round(costeTotal * 100) / 100,
+      fecha: new Date().toISOString()
+    };
+
+    console.log("💾 Receta Maestra Guardada:", recetaMaestra);
+    alert(`✅ Receta Maestra guardada en consola.\n\nCoste estimado: ${costeTotal.toFixed(2)} €\n\nRevisa la consola del navegador (F12) para ver todos los detalles.`);
+  };
+
+  const limiteAlcanzado = iteracionActual >= MAX_ITERACIONES && !aprobado;
+
+  // Calcular coste total
+  const costeTotal = formulacion.insumos.reduce((total, inp) => {
+    const tinta = tintasBase.find(t => t.id === inp.tintaId);
+    if (!tinta) return total;
+    const factorEscala = escalaGramos / formulacion.totalGramos;
+    const gramosEscalados = inp.gramos * factorEscala;
+    const coste = (gramosEscalados / 1000) * tinta.costPerKg;
+    return total + coste;
+  }, 0);
 
   return (
     <div className="space-y-4">
-      {/* Medición del colorímetro */}
-      <div className="bg-gray-800/50 rounded-xl border border-gray-700 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Gauge className="w-5 h-5 text-yellow-400" />
-          <h3 className="text-sm font-bold text-white">Medición Colorímetro (Prueba 100g)</h3>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <div>
-            <label className="text-[10px] text-gray-400 block mb-1">L* (Luminosidad)</label>
-            <input
-              type="number"
-              step="0.1"
-              value={medicionLAB.L || ""}
-              onChange={(e) => setMedicionLAB({ ...medicionLAB, L: parseFloat(e.target.value) || 0 })}
-              placeholder="0-100"
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] text-gray-400 block mb-1">a* (Rojo/Verde)</label>
-            <input
-              type="number"
-              step="0.1"
-              value={medicionLAB.a || ""}
-              onChange={(e) => setMedicionLAB({ ...medicionLAB, a: parseFloat(e.target.value) || 0 })}
-              placeholder="-128 a +127"
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] text-gray-400 block mb-1">b* (Amarillo/Azul)</label>
-            <input
-              type="number"
-              step="0.1"
-              value={medicionLAB.b || ""}
-              onChange={(e) => setMedicionLAB({ ...medicionLAB, b: parseFloat(e.target.value) || 0 })}
-              placeholder="-128 a +127"
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500"
-            />
+      {/* 1. Sección de Historial */}
+      {historialMedidas.length > 0 && (
+        <div className="bg-gray-800/50 rounded-xl border border-gray-700 p-4">
+          <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+            <span>📊</span> Historial de Mediciones
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-700">
+                  <th className="text-left py-2 px-2 text-gray-400">#</th>
+                  <th className="text-left py-2 px-2 text-gray-400">L*</th>
+                  <th className="text-left py-2 px-2 text-gray-400">a*</th>
+                  <th className="text-left py-2 px-2 text-gray-400">b*</th>
+                  <th className="text-left py-2 px-2 text-gray-400">ΔE*00</th>
+                  <th className="text-left py-2 px-2 text-gray-400">Hora</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historialMedidas.map((medida, idx) => (
+                  <tr key={idx} className="border-b border-gray-700/50">
+                    <td className="py-2 px-2 text-white font-bold">{medida.iteracion}</td>
+                    <td className="py-2 px-2 text-white">{medida.labMedido.L.toFixed(1)}</td>
+                    <td className="py-2 px-2 text-white">{medida.labMedido.a.toFixed(1)}</td>
+                    <td className="py-2 px-2 text-white">{medida.labMedido.b.toFixed(1)}</td>
+                    <td className="py-2 px-2">
+                      <span className={`font-bold ${medida.deltaE <= toleranciaDeltaE ? 'text-green-400' : 'text-orange-400'}`}>
+                        {medida.deltaE.toFixed(2)}
+                      </span>
+                    </td>
+                    <td className="py-2 px-2 text-gray-400">{medida.timestamp}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
+      )}
 
-        <div className="flex gap-2">
-          <button
-            onClick={handleMedir}
-            className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors"
-          >
-            📏 Medir Delta E (CIEDE2000)
-          </button>
-          <button
-            onClick={handleReset}
-            className="bg-gray-700 hover:bg-gray-600 text-gray-300 p-2 rounded-lg transition-colors"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
-        </div>
-
-        {hasMedicion && (
-          <div className="mt-3 p-3 rounded-xl" style={{ backgroundColor: evaluation.color + "15", border: `1px solid ${evaluation.color}40` }}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xs text-gray-400">ΔE*00 vs Objetivo</div>
-                <div className="text-2xl font-black" style={{ color: evaluation.color }}>
-                  {medicionDeltaE.toFixed(2)}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-bold" style={{ color: evaluation.color }}>
-                  {isDeltaAcceptable ? <CheckCircle2 className="w-6 h-6 inline mr-1" /> : <AlertTriangle className="w-6 h-6 inline mr-1" />}
-                  {evaluation.rating}
-                </div>
-                <div className="text-[10px] text-gray-400">{evaluation.tolerance}</div>
-              </div>
-            </div>
-
-            {/* Desglose de diferencias */}
-            <div className="grid grid-cols-3 gap-2 mt-3">
-              <div className="text-center bg-gray-800/50 rounded-lg p-2">
-                <div className="text-xs text-gray-400">ΔL*</div>
-                <div className={`text-sm font-bold ${(medicionLAB.L - targetLAB.L) > 0 ? "text-orange-400" : "text-blue-400"}`}>
-                  {(medicionLAB.L - targetLAB.L) > 0 ? "+" : ""}{(medicionLAB.L - targetLAB.L).toFixed(2)}
-                </div>
-                <div className="text-[9px] text-gray-500">
-                  {(medicionLAB.L - targetLAB.L) > 0 ? "Más claro" : "Más oscuro"}
-                </div>
-              </div>
-              <div className="text-center bg-gray-800/50 rounded-lg p-2">
-                <div className="text-xs text-gray-400">Δa*</div>
-                <div className={`text-sm font-bold ${(medicionLAB.a - targetLAB.a) > 0 ? "text-red-400" : "text-green-400"}`}>
-                  {(medicionLAB.a - targetLAB.a) > 0 ? "+" : ""}{(medicionLAB.a - targetLAB.a).toFixed(2)}
-                </div>
-                <div className="text-[9px] text-gray-500">
-                  {(medicionLAB.a - targetLAB.a) > 0 ? "Más rojo" : "Más verde"}
-                </div>
-              </div>
-              <div className="text-center bg-gray-800/50 rounded-lg p-2">
-                <div className="text-xs text-gray-400">Δb*</div>
-                <div className={`text-sm font-bold ${(medicionLAB.b - targetLAB.b) > 0 ? "text-yellow-400" : "text-blue-400"}`}>
-                  {(medicionLAB.b - targetLAB.b) > 0 ? "+" : ""}{(medicionLAB.b - targetLAB.b).toFixed(2)}
-                </div>
-                <div className="text-[9px] text-gray-500">
-                  {(medicionLAB.b - targetLAB.b) > 0 ? "Más amarillo" : "Más azul"}
-                </div>
-              </div>
+      {/* Alerta de límite de iteraciones */}
+      {limiteAlcanzado && (
+        <div className="bg-red-900/30 border-2 border-red-500 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-lg font-bold text-red-400 mb-2">
+                ⚠️ Se alcanzó el límite de 5 iteraciones sin aprobar
+              </h3>
+              <p className="text-sm text-red-300">
+                Por favor, revise la tinta base, el sustrato o el estado del anilox.
+              </p>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Ajuste fino de la mezcla */}
-      {hasMedicion && !isDeltaAcceptable && (
+      {/* 2. Sección de Captura de Medida */}
+      {!aprobado && !limiteAlcanzado && (
         <div className="bg-gray-800/50 rounded-xl border border-gray-700 p-4">
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-lg">🔧</span>
-            <h3 className="text-sm font-bold text-white">Ajuste Fino (±0.1g por clic)</h3>
+            <Gauge className="w-5 h-5 text-yellow-400" />
+            <h3 className="text-sm font-bold text-white">
+              Medición Colorímetro - Iteración {iteracionActual + 1}
+            </h3>
           </div>
+
+          {/* Selector de método de entrada */}
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setMetodoEntrada('manual')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                metodoEntrada === 'manual'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              <Keyboard className="w-4 h-4" />
+              Manual
+            </button>
+            <button
+              onClick={() => setMetodoEntrada('csv')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                metodoEntrada === 'csv'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Importar CSV Linshang
+            </button>
+          </div>
+
+          {/* Input manual */}
+          {metodoEntrada === 'manual' && (
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              <div>
+                <label className="text-[10px] text-gray-400 block mb-1">L* (Luminosidad)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={medicionLAB.L || ""}
+                  onChange={(e) => setMedicionLAB({ ...medicionLAB, L: parseFloat(e.target.value) || 0 })}
+                  placeholder="0-100"
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-400 block mb-1">a* (Rojo/Verde)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={medicionLAB.a || ""}
+                  onChange={(e) => setMedicionLAB({ ...medicionLAB, a: parseFloat(e.target.value) || 0 })}
+                  placeholder="-128 a +127"
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-400 block mb-1">b* (Amarillo/Azul)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={medicionLAB.b || ""}
+                  onChange={(e) => setMedicionLAB({ ...medicionLAB, b: parseFloat(e.target.value) || 0 })}
+                  placeholder="-128 a +127"
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Input CSV */}
+          {metodoEntrada === 'csv' && (
+            <div className="mb-3">
+              <label className="text-xs text-gray-400 block mb-2">
+                Selecciona el archivo CSV exportado del colorímetro Linshang
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                className="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500 file:cursor-pointer cursor-pointer"
+              />
+              {(medicionLAB.L > 0 || medicionLAB.a !== 0 || medicionLAB.b !== 0) && (
+                <div className="mt-2 p-2 bg-green-900/20 border border-green-700/50 rounded-lg">
+                  <div className="text-xs text-green-400 font-bold mb-1">✓ Datos cargados desde CSV:</div>
+                  <div className="text-xs text-gray-300 font-mono">
+                    L: {medicionLAB.L.toFixed(2)} | a: {medicionLAB.a.toFixed(2)} | b: {medicionLAB.b.toFixed(2)}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Botón registrar medida */}
+          <button
+            onClick={handleRegistrarMedida}
+            disabled={metodoEntrada === 'manual' && medicionLAB.L === 0 && medicionLAB.a === 0 && medicionLAB.b === 0}
+            className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg text-sm transition-colors"
+          >
+            📏 Registrar Medida de la Iteración {iteracionActual + 1}
+          </button>
+        </div>
+      )}
+
+      {/* 3. Sección de Resultado y Corrección */}
+      {ajusteRecomendado && !aprobado && !limiteAlcanzado && (
+        <div className="bg-orange-900/20 border-2 border-orange-500 rounded-xl p-4">
+          <h3 className="text-lg font-bold text-orange-400 mb-3 flex items-center gap-2">
+            🔧 Ajuste Automático Recomendado
+          </h3>
+          
+          <div className="bg-gray-900/50 rounded-lg p-3 mb-4">
+            <p className="text-sm text-gray-200 leading-relaxed">
+              {ajusteRecomendado.explicacion}
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={handleAplicarAjuste}
+              className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-4 rounded-lg transition-colors"
+            >
+              ✅ Aplicar este Ajuste a la Mezcla
+            </button>
+            <button
+              onClick={() => setShowManualAdjust(!showManualAdjust)}
+              className="bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium py-3 px-4 rounded-lg transition-colors"
+            >
+              🛠️ Ajuste Manual
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Ajuste manual (opcional) */}
+      {showManualAdjust && !aprobado && !limiteAlcanzado && (
+        <div className="bg-gray-800/50 rounded-xl border border-gray-700 p-4">
+          <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+            <span>🛠️</span> Ajuste Manual (±0.1g por clic)
+          </h3>
 
           <div className="space-y-2">
             {formulacion.insumos.map(inp => (
@@ -204,25 +454,25 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, toler
                 </div>
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => handleAjuste(inp.tintaId, -0.1)}
+                    onClick={() => handleAjusteManual(inp.tintaId, -0.1)}
                     className="w-7 h-7 bg-red-900/50 hover:bg-red-800 border border-red-700 rounded-lg flex items-center justify-center transition-colors"
                   >
                     <Minus className="w-3 h-3 text-red-400" />
                   </button>
                   <button
-                    onClick={() => handleAjuste(inp.tintaId, -0.05)}
+                    onClick={() => handleAjusteManual(inp.tintaId, -0.05)}
                     className="w-6 h-6 bg-red-900/30 hover:bg-red-800/50 border border-red-800 rounded text-[10px] text-red-400 font-bold transition-colors"
                   >
                     -05
                   </button>
                   <button
-                    onClick={() => handleAjuste(inp.tintaId, 0.05)}
+                    onClick={() => handleAjusteManual(inp.tintaId, 0.05)}
                     className="w-6 h-6 bg-green-900/30 hover:bg-green-800/50 border border-green-800 rounded text-[10px] text-green-400 font-bold transition-colors"
                   >
                     +05
                   </button>
                   <button
-                    onClick={() => handleAjuste(inp.tintaId, 0.1)}
+                    onClick={() => handleAjusteManual(inp.tintaId, 0.1)}
                     className="w-7 h-7 bg-green-900/50 hover:bg-green-800 border border-green-700 rounded-lg flex items-center justify-center transition-colors"
                   >
                     <Plus className="w-3 h-3 text-green-400" />
@@ -234,17 +484,32 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, toler
         </div>
       )}
 
-      {/* Escalado a producción */}
-      {hasMedicion && isDeltaAcceptable && (
+      {/* Panel de APROBADO */}
+      {aprobado && (
+        <div className="bg-green-900/30 border-2 border-green-500 rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-8 h-8 text-green-400" />
+            <div>
+              <h3 className="text-xl font-bold text-green-400">✅ ¡APROBADO!</h3>
+              <p className="text-sm text-green-300">
+                Delta E*00 dentro de tolerancia (≤ {toleranciaDeltaE.toFixed(1)})
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Sección de Escalado a Producción */}
+      {aprobado && (
         <div className="bg-gradient-to-r from-green-900/30 to-blue-900/30 rounded-xl border border-green-700 p-4">
           <div className="flex items-center gap-2 mb-3">
             <ArrowUpCircle className="w-5 h-5 text-green-400" />
-            <h3 className="text-sm font-bold text-white">¡ΔE*00 ≤ {toleranciaDeltaE.toFixed(1)} Aceptable! Escalar a Producción</h3>
+            <h3 className="text-sm font-bold text-white">Escalar a Producción</h3>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 mb-4">
             <div className="flex-1">
-              <label className="text-xs text-gray-400 block mb-1">Gramos objetivo (max 1000g)</label>
+              <label className="text-xs text-gray-400 block mb-1">Gramos objetivo (100-1000g)</label>
               <input
                 type="number"
                 value={escalaGramos}
@@ -263,23 +528,45 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, toler
             </button>
           </div>
 
-          <div className="mt-3 text-xs text-gray-400 text-center">
-            Factor de escala: {(escalaGramos / formulacion.totalGramos).toFixed(1)}x
+          {/* Coste estimado */}
+          <div className="bg-gray-900/50 rounded-lg p-3 mb-4">
+            <div className="text-xs text-gray-400 mb-1">Coste estimado de la mezcla:</div>
+            <div className="text-2xl font-bold text-green-400">
+              {costeTotal.toFixed(2)} €
+            </div>
+            <div className="text-[10px] text-gray-500">
+              Para {escalaGramos}g de mezcla final
+            </div>
           </div>
+
+          {/* Botón guardar receta */}
+          <button
+            onClick={handleGuardarReceta}
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            <Save className="w-5 h-5" />
+            💾 Guardar Receta Maestra
+          </button>
         </div>
       )}
 
       {/* Visualización del color medido vs objetivo */}
-      {hasMedicion && (
+      {historialMedidas.length > 0 && (
         <div className="flex items-center gap-3">
           <div className="flex-1 text-center">
-            <div className="text-[10px] text-gray-400">Medido (Colorímetro)</div>
+            <div className="text-[10px] text-gray-400">Última Medición</div>
             <div
               className="w-full h-10 rounded-lg border border-gray-600"
-              style={{ backgroundColor: labToHex(medicionLAB.L, medicionLAB.a, medicionLAB.b) }}
+              style={{ backgroundColor: labToHex(
+                historialMedidas[historialMedidas.length - 1].labMedido.L,
+                historialMedidas[historialMedidas.length - 1].labMedido.a,
+                historialMedidas[historialMedidas.length - 1].labMedido.b
+              ) }}
             />
             <div className="text-[9px] text-gray-500 font-mono mt-1">
-              {medicionLAB.L.toFixed(1)}/{medicionLAB.a.toFixed(1)}/{medicionLAB.b.toFixed(1)}
+              {historialMedidas[historialMedidas.length - 1].labMedido.L.toFixed(1)}/
+              {historialMedidas[historialMedidas.length - 1].labMedido.a.toFixed(1)}/
+              {historialMedidas[historialMedidas.length - 1].labMedido.b.toFixed(1)}
             </div>
           </div>
           <div className="text-gray-500 text-xs">vs</div>
