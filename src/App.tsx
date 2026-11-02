@@ -4,13 +4,14 @@ import SustratoSelector from "./components/SustratoSelector";
 import FamiliaSelector from "./components/FamiliaSelector";
 import ResistenciasSelector, { Resistencias } from "./components/ResistenciasSelector";
 import TintasBaseManager from "./components/TintasBaseManager";
+import IteracionPanel from "./components/IteracionPanel";
 import { PantoneColor } from "./data/pantoneLab";
 import { Sustrato } from "./data/sustratos";
 import { FamiliaTinta, TintaBase, tintasBase } from "./data/tintasBase";
 import { formularColor, Formulacion, labToHex } from "./utils/colorCalculations";
 import { Beaker, Sparkles, ChevronRight, AlertCircle, Palette } from "lucide-react";
 
-type Step = "config" | "formulacion";
+type Step = "config" | "formulacion" | "iteracion";
 type Tab = "formulacion" | "tintas";
 
 export default function App() {
@@ -30,6 +31,7 @@ export default function App() {
     grasa: false,
     alcalino: false
   });
+  const [toleranciaDeltaE, setToleranciaDeltaE] = useState<number>(2.0);
 
   // Filtrar tintas por familia y resistencias
   const tintasFiltradas = useMemo(() => {
@@ -134,16 +136,16 @@ export default function App() {
 
           {/* Step indicator */}
           <div className="hidden sm:flex items-center gap-2">
-            {(["config", "formulacion"] as Step[]).map((s, i) => (
+            {(["config", "formulacion", "iteracion"] as Step[]).map((s, i) => (
               <div key={s} className="flex items-center">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
                   step === s ? "border-blue-500 bg-blue-500 text-white" :
-                  (["config", "formulacion"].indexOf(step) > i) ? "border-green-500 bg-green-500/20 text-green-400" :
+                  (["config", "formulacion", "iteracion"].indexOf(step) > i) ? "border-green-500 bg-green-500/20 text-green-400" :
                   "border-gray-600 text-gray-500"
                 }`}>
                   {i + 1}
                 </div>
-                {i < 1 && <ChevronRight className="w-4 h-4 text-gray-600 mx-1" />}
+                {i < 2 && <ChevronRight className="w-4 h-4 text-gray-600 mx-1" />}
               </div>
             ))}
           </div>
@@ -297,11 +299,64 @@ export default function App() {
               </div>
 
               <button
+                onClick={() => setStep("iteracion")}
+                className="w-full mt-6 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg shadow-orange-500/20"
+              >
+                📏 Ir a Medición y Ajuste
+              </button>
+              
+              <button
                 onClick={handleNuevaFormulacion}
-                className="w-full mt-6 bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium py-3 px-6 rounded-xl transition-colors"
+                className="w-full mt-2 bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium py-3 px-6 rounded-xl transition-colors"
               >
                 ← Nueva Formulación
               </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "formulacion" && step === "iteracion" && formulacion && sustrato && (
+          <div className="space-y-6">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-black mb-2">Medición y Ajuste</h2>
+              <p className="text-gray-400 text-sm">
+                Mide con el colorímetro y ajusta hasta ΔE*00 ≤ {toleranciaDeltaE.toFixed(1)}
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              <IteracionPanel
+                formulacion={formulacion}
+                sustrato={sustrato}
+                targetLAB={targetLAB}
+                toleranciaDeltaE={toleranciaDeltaE}
+                onUpdate={setFormulacion}
+              />
+              
+              <div className="space-y-4">
+                <div className="bg-gray-800/50 rounded-xl border border-gray-700 p-4">
+                  <h3 className="text-sm font-bold text-white mb-3">📋 Formulación Actual</h3>
+                  <div className="space-y-2">
+                    {formulacion.insumos.map(inp => (
+                      <div key={inp.tintaId} className="flex justify-between items-center text-sm">
+                        <span className="text-gray-300">{inp.tintaName}</span>
+                        <span className="text-white font-mono">{inp.gramos.toFixed(1)}g</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-gray-700 flex justify-between">
+                    <span className="text-gray-400">Total:</span>
+                    <span className="text-white font-bold">{formulacion.totalGramos.toFixed(1)}g</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleNuevaFormulacion}
+                  className="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium py-3 px-6 rounded-xl transition-colors"
+                >
+                  ← Nueva Formulación
+                </button>
+              </div>
             </div>
           </div>
         )}
