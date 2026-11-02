@@ -59,9 +59,9 @@ export default function App() {
               <Beaker className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-black tracking-tight">FlexColor Pro</h1>
+              <h1 className="text-lg font-black tracking-tight">FlexColor Pro <span className="text-xs font-normal text-blue-400">v2.0</span></h1>
               <p className="text-[10px] text-gray-400 -mt-0.5">
-                Formulación Flexográfica • Delta E CIEDE2000 • Kubelka-Munk
+                Formulación Flexográfica • Delta E CIEDE2000 • Kubelka-Munk • chroma-js
               </p>
             </div>
           </div>
