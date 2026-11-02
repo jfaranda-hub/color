@@ -263,7 +263,7 @@ export function calcularLABMezcla(
   const totalGramos = insumos.reduce((s, inp) => s + inp.gramos, 0);
 
   for (const insumo of insumos) {
-    const tinta = tintas.find((t: TintaBase) => t.id === insumo.tintaId);
+    const tinta = tintas.find((t: TintaBase) => t && t.id === insumo.tintaId);
     if (!tinta || tinta.tintingStrength === 0) continue;
 
     const concentration = insumo.gramos / 100;
@@ -285,7 +285,7 @@ export function calcularLABMezcla(
   const bReflect = reflectanceFromKs(totalKsB);
 
   const avgOpacity = insumos.reduce((sum, inp) => {
-    const tinta = tintas.find(t => t.id === inp.tintaId);
+    const tinta = tintas.find(t => t && t.id === inp.tintaId);
     return sum + (tinta?.opacity || 0) * inp.gramos;
   }, 0) / Math.max(1, totalGramos);
 
@@ -320,52 +320,86 @@ function seleccionarTintasRelevantes(L: number, a: number, b: number, tintas: Ti
   const hue = Math.atan2(b, a) * 180 / Math.PI;
 
   if (L > 65) {
-    relevantes.push(tintas.find(t => t.id === "blanco")!);
+    const blanco = tintas.find(t => t && t.id === "blanco");
+    if (blanco) relevantes.push(blanco);
   } else {
-    relevantes.push(tintas.find(t => t.id === "transparente")!);
+    const transparente = tintas.find(t => t && t.id === "transparente");
+    if (transparente) relevantes.push(transparente);
   }
 
   if (chromaVal < 10) {
-    relevantes.push(tintas.find(t => t.id === "negro")!);
-    if (L > 50) relevantes.push(tintas.find(t => t.id === "blanco")!);
+    const negro = tintas.find(t => t && t.id === "negro");
+    if (negro) relevantes.push(negro);
+    if (L > 50) {
+      const blanco = tintas.find(t => t && t.id === "blanco");
+      if (blanco) relevantes.push(blanco);
+    }
   } else {
     if (hue >= -20 && hue < 30) {
-      relevantes.push(tintas.find(t => t.id === "rojo-amarillento")!);
-      if (b > 40) relevantes.push(tintas.find(t => t.id === "amarillo")!);
-      if (b > 50) relevantes.push(tintas.find(t => t.id === "naranja")!);
+      const rojoAmarillento = tintas.find(t => t && t.id === "rojo-amarillento");
+      if (rojoAmarillento) relevantes.push(rojoAmarillento);
+      if (b > 40) {
+        const amarillo = tintas.find(t => t && t.id === "amarillo");
+        if (amarillo) relevantes.push(amarillo);
+      }
+      if (b > 50) {
+        const naranja = tintas.find(t => t && t.id === "naranja");
+        if (naranja) relevantes.push(naranja);
+      }
     } else if (hue >= 30 && hue < 70) {
-      relevantes.push(tintas.find(t => t.id === "naranja")!);
-      relevantes.push(tintas.find(t => t.id === "amarillo")!);
+      const naranja = tintas.find(t => t && t.id === "naranja");
+      if (naranja) relevantes.push(naranja);
+      const amarillo = tintas.find(t => t && t.id === "amarillo");
+      if (amarillo) relevantes.push(amarillo);
     } else if (hue >= 70 && hue < 110) {
-      relevantes.push(tintas.find(t => t.id === "amarillo")!);
-      if (a < 0) relevantes.push(tintas.find(t => t.id === "amarillo-verdoso")!);
+      const amarillo = tintas.find(t => t && t.id === "amarillo");
+      if (amarillo) relevantes.push(amarillo);
+      if (a < 0) {
+        const amarilloVerdoso = tintas.find(t => t && t.id === "amarillo-verdoso");
+        if (amarilloVerdoso) relevantes.push(amarilloVerdoso);
+      }
     } else if (hue >= 110 && hue < 160) {
-      relevantes.push(tintas.find(t => t.id === "verde")!);
-      relevantes.push(tintas.find(t => t.id === "amarillo-verdoso")!);
+      const verde = tintas.find(t => t && t.id === "verde");
+      if (verde) relevantes.push(verde);
+      const amarilloVerdoso = tintas.find(t => t && t.id === "amarillo-verdoso");
+      if (amarilloVerdoso) relevantes.push(amarilloVerdoso);
     } else if (hue >= 160 || hue < -160) {
-      relevantes.push(tintas.find(t => t.id === "verde")!);
-      relevantes.push(tintas.find(t => t.id === "azul-verdoso")!);
+      const verde = tintas.find(t => t && t.id === "verde");
+      if (verde) relevantes.push(verde);
+      const azulVerdoso = tintas.find(t => t && t.id === "azul-verdoso");
+      if (azulVerdoso) relevantes.push(azulVerdoso);
     } else if (hue >= -160 && hue < -110) {
-      relevantes.push(tintas.find(t => t.id === "azul-verdoso")!);
-      relevantes.push(tintas.find(t => t.id === "azul")!);
+      const azulVerdoso = tintas.find(t => t && t.id === "azul-verdoso");
+      if (azulVerdoso) relevantes.push(azulVerdoso);
+      const azul = tintas.find(t => t && t.id === "azul");
+      if (azul) relevantes.push(azul);
     } else if (hue >= -110 && hue < -60) {
-      relevantes.push(tintas.find(t => t.id === "azul")!);
-      if (b < -30) relevantes.push(tintas.find(t => t.id === "violeta")!);
+      const azul = tintas.find(t => t && t.id === "azul");
+      if (azul) relevantes.push(azul);
+      if (b < -30) {
+        const violeta = tintas.find(t => t && t.id === "violeta");
+        if (violeta) relevantes.push(violeta);
+      }
     } else if (hue >= -60 && hue < -20) {
-      relevantes.push(tintas.find(t => t.id === "magenta")!);
-      relevantes.push(tintas.find(t => t.id === "violeta")!);
+      const magenta = tintas.find(t => t && t.id === "magenta");
+      if (magenta) relevantes.push(magenta);
+      const violeta = tintas.find(t => t && t.id === "violeta");
+      if (violeta) relevantes.push(violeta);
     } else {
-      relevantes.push(tintas.find(t => t.id === "rojo")!);
-      relevantes.push(tintas.find(t => t.id === "magenta")!);
+      const rojo = tintas.find(t => t && t.id === "rojo");
+      if (rojo) relevantes.push(rojo);
+      const magenta = tintas.find(t => t && t.id === "magenta");
+      if (magenta) relevantes.push(magenta);
     }
 
     if (L < 40) {
-      relevantes.push(tintas.find(t => t.id === "negro")!);
+      const negro = tintas.find(t => t && t.id === "negro");
+      if (negro) relevantes.push(negro);
     }
   }
 
   const uniqueIds = [...new Set(relevantes.map(t => t.id))];
-  return uniqueIds.map(id => tintas.find(t => t.id === id)!).filter(Boolean);
+  return uniqueIds.map(id => tintas.find(t => t && t.id === id)).filter((t): t is TintaBase => t !== undefined);
 }
 
 export function formularColor(
@@ -494,7 +528,10 @@ export function calcularAjusteAutomatico(
   
   const cantidadesSimulacion = [0.5, 1.0, 1.5]; // Probamos 3 cantidades para mayor precisión
 
-  for (const tinta of tintas) {
+  // Filtrar tintas válidas para evitar errores de undefined
+  const tintasValidas = tintas.filter(t => t && t.id);
+
+  for (const tinta of tintasValidas) {
     if (tinta.id === "transparente") continue; // El transparente no corrige color, solo opacidad
     
     for (const gramosAñadir of cantidadesSimulacion) {

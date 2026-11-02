@@ -94,7 +94,7 @@ class LocalStorageTintasService implements ITintasService {
    */
   getById(id: string): TintaBase | undefined {
     const tintas = this.readFromStorage();
-    return tintas.find(t => t.id === id);
+    return tintas.find(t => t && t.id === id);
   }
 
   /**
@@ -112,7 +112,7 @@ class LocalStorageTintasService implements ITintasService {
    */
   update(id: string, data: Partial<TintaBase>): TintaBase | undefined {
     const tintas = this.readFromStorage();
-    const index = tintas.findIndex(t => t.id === id);
+    const index = tintas.findIndex(t => t && t.id === id);
     
     if (index === -1) {
       return undefined;
@@ -130,7 +130,7 @@ class LocalStorageTintasService implements ITintasService {
    */
   delete(id: string): boolean {
     const tintas = this.readFromStorage();
-    const index = tintas.findIndex(t => t.id === id);
+    const index = tintas.findIndex(t => t && t.id === id);
     
     if (index === -1) {
       return false;

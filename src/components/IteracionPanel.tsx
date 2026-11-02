@@ -257,7 +257,7 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, toler
 
   const handleGuardarReceta = () => {
     const costeTotal = formulacion.insumos.reduce((total, inp) => {
-      const tinta = tintasBase.find(t => t.id === inp.tintaId);
+      const tinta = tintasBase.find(t => t && t.id === inp.tintaId);
       if (!tinta) return total;
       const factorEscala = escalaGramos / formulacion.totalGramos;
       const gramosEscalados = inp.gramos * factorEscala;
@@ -282,7 +282,7 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, toler
 
   // Calcular coste total
   const costeTotal = formulacion.insumos.reduce((total, inp) => {
-    const tinta = tintasBase.find(t => t.id === inp.tintaId);
+    const tinta = tintasBase.find(t => t && t.id === inp.tintaId);
     if (!tinta) return total;
     const factorEscala = escalaGramos / formulacion.totalGramos;
     const gramosEscalados = inp.gramos * factorEscala;

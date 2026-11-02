@@ -71,7 +71,7 @@ export function useTintasBase(): UseTintasBaseReturn {
     const tintaActualizada = tintasService.update(id, data);
     if (tintaActualizada) {
       setTintas(prev => 
-        prev.map(t => t.id === id ? tintaActualizada : t)
+        prev.map(t => t && t.id === id ? tintaActualizada : t)
       );
     }
   };
@@ -83,7 +83,7 @@ export function useTintasBase(): UseTintasBaseReturn {
   const eliminarTinta = (id: string): void => {
     const eliminado = tintasService.delete(id);
     if (eliminado) {
-      setTintas(prev => prev.filter(t => t.id !== id));
+      setTintas(prev => prev.filter(t => t && t.id !== id));
     }
   };
 

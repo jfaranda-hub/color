@@ -34,6 +34,8 @@ export default function App() {
   // Filtrar tintas por familia y resistencias
   const tintasFiltradas = useMemo(() => {
     return tintasBase.filter(tinta => {
+      if (!tinta) return false;
+      
       // Filtrar por familia
       if (familiaSeleccionada !== 'todas' && tinta.familia !== familiaSeleccionada) {
         return false;

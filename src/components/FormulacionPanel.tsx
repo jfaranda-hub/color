@@ -67,7 +67,7 @@ export default function FormulacionPanel({ formulacion, targetLAB, targetColor }
 
         <div className="space-y-2">
           {formulacion.insumos.map(inp => {
-            const tinta = tintasBase.find(t => t.id === inp.tintaId);
+            const tinta = tintasBase.find(t => t && t.id === inp.tintaId);
             return (
               <div key={inp.tintaId} className="flex items-center gap-3">
                 <div
