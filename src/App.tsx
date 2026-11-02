@@ -3,16 +3,19 @@ import PantoneSelector from "./components/PantoneSelector";
 import SustratoSelector from "./components/SustratoSelector";
 import FamiliaSelector from "./components/FamiliaSelector";
 import ResistenciasSelector, { Resistencias } from "./components/ResistenciasSelector";
+import TintasBaseManager from "./components/TintasBaseManager";
 import { PantoneColor } from "./data/pantoneLab";
 import { Sustrato } from "./data/sustratos";
 import { FamiliaTinta, TintaBase, tintasBase } from "./data/tintasBase";
 import { formularColor, Formulacion, labToHex } from "./utils/colorCalculations";
-import { Beaker, Sparkles, ChevronRight, AlertCircle } from "lucide-react";
+import { Beaker, Sparkles, ChevronRight, AlertCircle, Palette } from "lucide-react";
 
 type Step = "config" | "formulacion";
+type Tab = "formulacion" | "tintas";
 
 export default function App() {
   const [step, setStep] = useState<Step>("config");
+  const [activeTab, setActiveTab] = useState<Tab>("formulacion");
   const [pantone, setPantone] = useState<PantoneColor | null>(null);
   const [sustrato, setSustrato] = useState<Sustrato | null>(null);
   const [formulacion, setFormulacion] = useState<Formulacion | null>(null);
@@ -101,6 +104,32 @@ export default function App() {
             </div>
           </div>
 
+          {/* Tabs de navegación */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveTab("formulacion")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === "formulacion"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+              }`}
+            >
+              <Beaker className="w-4 h-4" />
+              Formulación
+            </button>
+            <button
+              onClick={() => setActiveTab("tintas")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === "tintas"
+                  ? "bg-purple-600 text-white"
+                  : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+              }`}
+            >
+              <Palette className="w-4 h-4" />
+              Gestión Tintas Base
+            </button>
+          </div>
+
           {/* Step indicator */}
           <div className="hidden sm:flex items-center gap-2">
             {(["config", "formulacion"] as Step[]).map((s, i) => (
@@ -121,7 +150,13 @@ export default function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {step === "config" && (
+        {activeTab === "tintas" && (
+          <div className="max-w-7xl mx-auto">
+            <TintasBaseManager />
+          </div>
+        )}
+
+        {activeTab === "formulacion" && step === "config" && (
           <div className="space-y-6">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-black mb-2">Configuración de Trabajo</h2>
@@ -220,7 +255,7 @@ export default function App() {
           </div>
         )}
 
-        {step === "formulacion" && formulacion && (
+        {activeTab === "formulacion" && step === "formulacion" && formulacion && (
           <div className="space-y-6">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-black mb-2">Formulación - 100g</h2>
