@@ -315,23 +315,24 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === "formulacion" && step === "iteracion" && formulacion && sustrato && (
-          <div className="space-y-6">
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-black mb-2">Medición y Ajuste</h2>
-              <p className="text-gray-400 text-sm">
-                Mide con el colorímetro y ajusta hasta ΔE*00 ≤ {toleranciaDeltaE.toFixed(1)}
-              </p>
-            </div>
+        {activeTab === "formulacion" && step === "iteracion" && (
+          formulacion && sustrato && pantone ? (
+            <div className="space-y-6">
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-black mb-2">Medición y Ajuste</h2>
+                <p className="text-gray-400 text-sm">
+                  Mide con el colorímetro y ajusta hasta ΔE*00 ≤ {toleranciaDeltaE.toFixed(1)}
+                </p>
+              </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
-              <IteracionPanel
-                formulacion={formulacion}
-                sustrato={sustrato}
-                targetLAB={targetLAB}
-                toleranciaDeltaE={toleranciaDeltaE}
-                onUpdate={setFormulacion}
-              />
+              <div className="grid md:grid-cols-2 gap-6">
+                <IteracionPanel
+                  formulacion={formulacion}
+                  sustrato={sustrato}
+                  targetLAB={targetLAB}
+                  toleranciaDeltaE={toleranciaDeltaE}
+                  onUpdate={setFormulacion}
+                />
               
               <div className="space-y-4">
                 <div className="bg-gray-800/50 rounded-xl border border-gray-700 p-4">
@@ -359,6 +360,17 @@ export default function App() {
               </div>
             </div>
           </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-gray-400">Datos incompletos. Por favor, vuelve a la configuración.</p>
+              <button
+                onClick={handleNuevaFormulacion}
+                className="mt-4 bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 px-6 rounded-xl transition-colors"
+              >
+                ← Volver a Configuración
+              </button>
+            </div>
+          )
         )}
       </main>
 
