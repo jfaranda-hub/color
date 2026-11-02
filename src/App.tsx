@@ -16,6 +16,7 @@ import { Sustrato } from "./data/sustratos";
 import { FamiliaTinta, TintaBase, tintasBase } from "./data/tintasBase";
 import { formularColor, Formulacion, labToHex } from "./utils/colorCalculations";
 import { runColorConversionTests } from "./utils/colorConversionTest";
+import { cargarBibliotecaBase } from "./services/cargaAutomatica";
 import { Beaker, Sparkles, ChevronRight, AlertCircle, Palette, TestTube, BookOpen, Library, FileText } from "lucide-react";
 
 type Step = "config" | "formulacion" | "iteracion";
@@ -40,7 +41,7 @@ export default function App() {
   });
   const [toleranciaDeltaE, setToleranciaDeltaE] = useState<number>(2.0);
 
-  // Ejecutar tests de conversión de color al cargar
+  // Ejecutar tests de conversión de color y cargar biblioteca base al iniciar
   useEffect(() => {
     console.log("\n🔬 EJECUTANDO TESTS DE CONVERSIÓN DE COLOR\n");
     const testResults = runColorConversionTests();
@@ -50,6 +51,19 @@ export default function App() {
     } else {
       console.log("\n✅ TODOS LOS TESTS PASARON. Conversiones validadas.");
     }
+
+    // Cargar automáticamente la biblioteca base de colores Pantone
+    console.log("\n📚 CARGANDO BIBLIOTECA BASE DE COLORES PANTONE\n");
+    cargarBibliotecaBase().then(result => {
+      if (result.success) {
+        console.log(`\n✅ Biblioteca base cargada: ${result.totalColores} colores`);
+        if (result.errores.length > 0) {
+          console.warn(`⚠️  Advertencias: ${result.errores.length}`);
+        }
+      } else {
+        console.error(`\n❌ Error cargando biblioteca base:`, result.errores);
+      }
+    });
   }, []);
 
   // Filtrar tintas por familia y resistencias
