@@ -526,16 +526,12 @@ export function calcularAjusteAutomatico(
   let menorDeltaE = deltaEActual;
   let mejorLabSimulado: LABColor | null = null;
   
-  const cantidadesSimulacion = [0.5, 1.0, 1.5]; // Probamos 3 cantidades para mayor precisión
+  const cantidadesSimulacion = [0.5, 1.0, 1.5];
 
-  // Filtrar tintas válidas para evitar errores de undefined
-  const tintasValidas = tintas.filter(t => t && t.id);
-
-  for (const tinta of tintasValidas) {
-    if (tinta.id === "transparente") continue; // El transparente no corrige color, solo opacidad
+  for (const tinta of tintas) {
+    if (tinta.id === "transparente" || tinta.tintingStrength === 0) continue;
     
     for (const gramosAñadir of cantidadesSimulacion) {
-      // CORRECCIÓN CRÍTICA: Copia profunda del array para no corromper datos originales
       const insumosSimulados = insumosActuales.map(inp => ({ ...inp }));
       const tintaExistente = insumosSimulados.find(inp => inp.tintaId === tinta.id);
       
@@ -566,7 +562,7 @@ export function calcularAjusteAutomatico(
   }
   
   if (!mejorTinta || !mejorLabSimulado || menorDeltaE >= deltaEActual) {
-    return null; // No se encontró mejora
+    return null;
   }
   
   const mejora = deltaEActual - menorDeltaE;
@@ -576,14 +572,11 @@ export function calcularAjusteAutomatico(
   
   let correccion = "";
   if (Math.abs(da) >= Math.abs(db)) {
-    correccion = da > 0 ? "corregir la desviación hacia el verde (añadiendo rojo/magenta)" : "corregir la desviación hacia el rojo (añadiendo verde/azul)";
+    correccion = da > 0 ? "corregir desviación hacia el verde (añadiendo rojo/magenta)" : "corregir desviación hacia el rojo (añadiendo verde/azul)";
   } else {
-    correccion = db > 0 ? "corregir la desviación hacia el azul (añadiendo amarillo)" : "corregir la desviación hacia el amarillo (añadiendo azul)";
+    correccion = db > 0 ? "corregir desviación hacia el azul (añadiendo amarillo)" : "corregir desviación hacia el amarillo (añadiendo azul)";
   }
-  
-  if (Math.abs(dL) > 1.5) {
-    correccion += dL > 0 ? " y aclarar el tono" : " y oscurecer el tono";
-  }
+  if (Math.abs(dL) > 1.5) correccion += dL > 0 ? " y aclarar el tono" : " y oscurecer el tono";
   
   return {
     tintaId: mejorTinta.id,
