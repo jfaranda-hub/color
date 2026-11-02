@@ -48,73 +48,54 @@ export default function IteracionPanel({ formulacion, sustrato, targetLAB, toler
 
     Papa.parse(file, {
       complete: (results) => {
-        console.log("📄 Datos CSV crudos:", results.data);
-        const data = results.data as string[][];
-        
-        if (data.length === 0) {
+        const data = results.data as any[];
+        if (!data || data.length === 0) {
           alert("El archivo CSV está vacío.");
           return;
         }
 
-        // ESTRATEGIA 1: Buscar cabeceras L, a, b en la primera fila
-        const headerRow = data[0];
-        let lIndex = -1, aIndex = -1, bIndex = -1;
-        
-        if (headerRow && headerRow.length > 0) {
-          headerRow.forEach((header, idx) => {
-            const h = header.trim().toLowerCase();
-            if (h === 'l' || h === 'l*' || h.includes('luminosidad')) lIndex = idx;
-            if (h === 'a' || h === 'a*' || h.includes('rojo')) aIndex = idx;
-            if (h === 'b' || h === 'b*' || h.includes('amarillo')) bIndex = idx;
-          });
-        }
+        let colL = -1, colA = -1, colB = -1;
+        const headers = data[0].map((h: string) => String(h).trim().toLowerCase());
 
-        let lastValidRow: LABColor | null = null;
+        // Intentar detectar cabeceras
+        colL = headers.findIndex((h: string) => h.includes('l') && !h.includes('ab'));
+        colA = headers.findIndex((h: string) => h.includes('a') && !h.includes('lab') && !h.includes('alpha'));
+        colB = headers.findIndex((h: string) => h.includes('b') && !h.includes('lab'));
 
-        if (lIndex >= 0 && aIndex >= 0 && bIndex >= 0) {
-          console.log(`✅ Cabeceras encontradas: L=${lIndex}, a=${aIndex}, b=${bIndex}`);
-          // Buscar la última fila con datos numéricos válidos
-          for (let i = data.length - 1; i >= 1; i--) { // Empezar desde 1 para saltar cabecera
-            const row = data[i];
-            if (row && row.length > Math.max(lIndex, aIndex, bIndex)) {
-              const L = parseFloat(row[lIndex]);
-              const a = parseFloat(row[aIndex]);
-              const b = parseFloat(row[bIndex]);
-              
-              if (!isNaN(L) && !isNaN(a) && !isNaN(b) && L > 0 && L <= 100) {
-                lastValidRow = { L, a, b };
-                console.log(`✅ Datos válidos encontrados en fila ${i}:`, lastValidRow);
-                break;
-              }
-            }
+        let lastValidRow = null;
+
+        // Buscar desde el final hacia el principio
+        for (let i = data.length - 1; i >= 0; i--) {
+          const row = data[i];
+          if (!row || row.length < 3) continue;
+
+          let L, a, b;
+          if (colL !== -1 && colA !== -1 && colB !== -1) {
+            // Usar índices detectados
+            L = parseFloat(row[colL]);
+            a = parseFloat(row[colA]);
+            b = parseFloat(row[colB]);
+          } else {
+            // Fallback: asumir que son las 3 primeras columnas numéricas válidas
+            L = parseFloat(row[0]);
+            a = parseFloat(row[1]);
+            b = parseFloat(row[2]);
           }
-        } else {
-          console.log("⚠️ No se encontraron cabeceras claras, usando fallback...");
-          // ESTRATEGIA 2: Fallback - buscar última fila con 3 valores numéricos
-          for (let i = data.length - 1; i >= 0; i--) {
-            const row = data[i];
-            if (row && row.length >= 3) {
-              const L = parseFloat(row[0]);
-              const a = parseFloat(row[1]);
-              const b = parseFloat(row[2]);
-              
-              if (!isNaN(L) && !isNaN(a) && !isNaN(b) && L > 0 && L <= 100) {
-                lastValidRow = { L, a, b };
-                console.log(`✅ Fallback: datos válidos en fila ${i}:`, lastValidRow);
-                break;
-              }
-            }
+
+          if (!isNaN(L) && !isNaN(a) && !isNaN(b) && L > 0 && L <= 100 && a >= -128 && a <= 127 && b >= -128 && b <= 127) {
+            lastValidRow = { L, a, b };
+            break;
           }
         }
 
         if (lastValidRow) {
+          console.log("✅ Datos LAB extraídos del CSV:", lastValidRow);
           setMedicionLAB(lastValidRow);
         } else {
-          alert("No se encontraron datos LAB válidos en el CSV. Asegúrate de que el archivo tenga columnas L, a, b.");
+          alert("No se encontraron datos LAB válidos en el CSV. Asegúrate de que el archivo contenga columnas numéricas para L, a, b.");
         }
       },
       error: (error) => {
-        console.error("❌ Error al leer CSV:", error);
         alert(`Error al leer el CSV: ${error.message}`);
       }
     });
