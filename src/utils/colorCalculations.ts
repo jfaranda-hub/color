@@ -632,3 +632,144 @@ export function escalarFormulacion(
     totalGramos: Math.round(gramosObjetivo * 100) / 100
   };
 }
+
+// ============================================
+// AJUSTE AUTOMÁTICO DE FORMULACIÓN
+// ============================================
+
+/**
+ * Calcula el ajuste óptimo para mejorar el Delta E de una formulación
+ * Simula añadir pequeñas cantidades de cada tinta y recomienda la mejor opción
+ * 
+ * @param labMedido - LAB medido con colorímetro de la mezcla actual
+ * @param labObjetivo - LAB objetivo (Pantone)
+ * @param insumosActuales - Array de insumos de la formulación actual
+ * @param tintas - Array de todas las tintas base disponibles
+ * @param sustrato - Sustrato de impresión
+ * @returns Objeto con la recomendación de ajuste o null si no hay mejora posible
+ */
+export function calcularAjusteAutomatico(
+  labMedido: LABColor,
+  labObjetivo: LABColor,
+  insumosActuales: FormulacionInsumo[],
+  tintas: TintaBase[],
+  sustrato: Sustrato
+): {
+  tintaId: string;
+  tintaName: string;
+  gramosAñadir: number;
+  deltaEAntes: number;
+  deltaEDespues: number;
+  mejora: number;
+  explicacion: string;
+} | null {
+  // 1. Calcular Delta E actual
+  const deltaEActual = getDeltaE00(labMedido, labObjetivo);
+  
+  // 2. Inicializar variables para guardar la mejor opción
+  let mejorTinta: TintaBase | null = null;
+  let mejoresGramos: number = 0;
+  let menorDeltaE = deltaEActual;
+  let mejorLabSimulado: LABColor | null = null;
+  
+  // 3. Cantidades a simular
+  const cantidadesSimulacion = [0.5, 1.0];
+  
+  // 4. Iterar sobre cada tinta
+  for (const tinta of tintas) {
+    // Excluir 'transparente' si ya está en la mezcla (no aporta color)
+    const yaEnMezcla = insumosActuales.some(inp => inp.tintaId === tinta.id);
+    if (tinta.id === "transparente" && yaEnMezcla) continue;
+    
+    // Para cada cantidad de simulación
+    for (const gramosAñadir of cantidadesSimulacion) {
+      // Crear copia de insumos y añadir la tinta
+      const insumosSimulados = [...insumosActuales];
+      const tintaExistente = insumosSimulados.find(inp => inp.tintaId === tinta.id);
+      
+      if (tintaExistente) {
+        // Si la tinta ya existe, aumentar su cantidad
+        tintaExistente.gramos += gramosAñadir;
+      } else {
+        // Si no existe, añadirla como nueva
+        insumosSimulados.push({
+          tintaId: tinta.id,
+          tintaName: tinta.name,
+          gramos: gramosAñadir,
+          porcentaje: 0 // Se recalculará después
+        });
+      }
+      
+      // Recalcular porcentajes
+      const totalGramos = insumosSimulados.reduce((sum, inp) => sum + inp.gramos, 0);
+      insumosSimulados.forEach(inp => {
+        inp.porcentaje = (inp.gramos / totalGramos) * 100;
+      });
+      
+      // Calcular LAB simulado
+      const labSimulado = calcularLABMezcla(insumosSimulados, tintas, sustrato);
+      
+      // Calcular Delta E simulado
+      const deltaESimulado = getDeltaE00(labSimulado, labObjetivo);
+      
+      // Si es mejor que la mejor opción actual, guardarla
+      if (deltaESimulado < menorDeltaE) {
+        menorDeltaE = deltaESimulado;
+        mejorTinta = tinta;
+        mejoresGramos = gramosAñadir;
+        mejorLabSimulado = labSimulado;
+      }
+    }
+  }
+  
+  // 5. Si no se encontró mejora, devolver null
+  if (!mejorTinta || !mejorLabSimulado) {
+    return null;
+  }
+  
+  // 6. Generar explicación en lenguaje natural
+  const mejora = deltaEActual - menorDeltaE;
+  const dL = mejorLabSimulado.L - labMedido.L;
+  const da = mejorLabSimulado.a - labMedido.a;
+  const db = mejorLabSimulado.b - labMedido.b;
+  
+  // Determinar qué desviación corrige
+  let correccion = "";
+  if (Math.abs(da) > Math.abs(db)) {
+    // Corrección principal en eje a*
+    if (da > 0) {
+      correccion = "corregir la desviación hacia el verde (a*)";
+    } else {
+      correccion = "corregir la desviación hacia el rojo (a*)";
+    }
+  } else {
+    // Corrección principal en eje b*
+    if (db > 0) {
+      correccion = "corregir la desviación hacia el azul (b*)";
+    } else {
+      correccion = "corregir la desviación hacia el amarillo (b*)";
+    }
+  }
+  
+  // Añadir información de luminosidad si es relevante
+  if (Math.abs(dL) > 2) {
+    if (dL > 0) {
+      correccion += " y aumentar la luminosidad";
+    } else {
+      correccion += " y reducir la luminosidad";
+    }
+  }
+  
+  const explicacion = `Añadir ${mejoresGramos.toFixed(1)}g de ${mejorTinta.name} para ${correccion}. Esto reducirá el ΔE*00 de ${deltaEActual.toFixed(2)} a ${menorDeltaE.toFixed(2)} (mejora de ${mejora.toFixed(2)}).`;
+  
+  // 7. Devolver la recomendación
+  return {
+    tintaId: mejorTinta.id,
+    tintaName: mejorTinta.name,
+    gramosAñadir: mejoresGramos,
+    deltaEAntes: Math.round(deltaEActual * 100) / 100,
+    deltaEDespues: Math.round(menorDeltaE * 100) / 100,
+    mejora: Math.round(mejora * 100) / 100,
+    explicacion
+  };
+}
