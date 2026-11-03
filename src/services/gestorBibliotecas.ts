@@ -1,12 +1,46 @@
 /**
  * Servicio para gestionar bibliotecas de color
  * Permite cargar, guardar, activar/desactivar bibliotecas
+ * 
+ * CORRECCIÓN Incidencia 4:
+ * - Las funciones ahora verifican la persistencia real
+ * - Devuelven información sobre éxito/fracaso del guardado
+ * - No capturan excepciones silenciosamente
  */
 
 import { BibliotecaColor, ColorPantone } from '../types/color';
 import { parseColorFile } from './parserCSV';
 
+// Re-exportar tipos para uso en otros módulos
+export type { BibliotecaColor, ColorPantone };
+
 const STORAGE_KEY = 'flexcolor_bibliotecas';
+
+/**
+ * Resultado de operaciones de guardado
+ */
+export interface SaveResult {
+  success: boolean;
+  error?: string;
+  quotaExceeded?: boolean;
+}
+
+/**
+ * Verifica si localStorage está disponible y tiene capacidad
+ */
+function checkLocalStorageAvailability(): { available: boolean; error?: string } {
+  try {
+    const test = '__test__';
+    localStorage.setItem(test, test);
+    localStorage.removeItem(test);
+    return { available: true };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+      return { available: false, error: 'Almacenamiento local lleno. Exporte sus datos y libere espacio.' };
+    }
+    return { available: false, error: 'Almacenamiento local no disponible' };
+  }
+}
 
 /**
  * Obtiene todas las bibliotecas guardadas
@@ -25,23 +59,55 @@ export function getBibliotecas(): BibliotecaColor[] {
 
 /**
  * Guarda todas las bibliotecas
+ * CORRECCIÓN: Verifica que el guardado fue exitoso
  */
-export function saveBibliotecas(bibliotecas: BibliotecaColor[]): void {
+export function saveBibliotecas(bibliotecas: BibliotecaColor[]): SaveResult {
+  // Verificar disponibilidad antes de guardar
+  const check = checkLocalStorageAvailability();
+  if (!check.available) {
+    return { success: false, error: check.error, quotaExceeded: check.error?.includes('lleno') };
+  }
+
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bibliotecas));
+    const serialized = JSON.stringify(bibliotecas);
+    localStorage.setItem(STORAGE_KEY, serialized);
+    
+    // VERIFICACIÓN: Leer de vuelta para confirmar que se guardó
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored !== serialized) {
+      return { success: false, error: 'Los datos no se guardaron correctamente' };
+    }
+    
+    return { success: true };
   } catch (error) {
-    console.error('Error saving bibliotecas:', error);
+    if (error instanceof DOMException) {
+      if (error.name === 'QuotaExceededError') {
+        return { 
+          success: false, 
+          error: 'Espacio de almacenamiento insuficiente. Exporte sus datos y libere espacio.',
+          quotaExceeded: true
+        };
+      }
+      if (error.name === 'SecurityError') {
+        return { 
+          success: false, 
+          error: 'Acceso al almacenamiento local bloqueado por el navegador'
+        };
+      }
+    }
+    return { success: false, error: `Error al guardar: ${error}` };
   }
 }
 
 /**
  * Crea una nueva biblioteca desde un archivo
+ * CORRECCIÓN: Verifica que el guardado fue exitoso
  */
 export function crearBiblioteca(
   nombre: string,
   fileContent: string,
   filename: string
-): { success: boolean; biblioteca?: BibliotecaColor; errores: string[] } {
+): { success: boolean; biblioteca?: BibliotecaColor; errores: string[]; saveError?: string } {
   const parseResult = parseColorFile(fileContent, filename);
   
   if (!parseResult.success || parseResult.colores.length === 0) {
@@ -63,10 +129,20 @@ export function crearBiblioteca(
     totalColores: parseResult.totalValidos
   };
 
-  // Guardar en localStorage
+  // Guardar en localStorage y verificar
   const bibliotecas = getBibliotecas();
   bibliotecas.push(biblioteca);
-  saveBibliotecas(bibliotecas);
+  
+  const saveResult = saveBibliotecas(bibliotecas);
+  
+  if (!saveResult.success) {
+    // Si falla el guardado, no devolver éxito
+    return {
+      success: false,
+      errores: [],
+      saveError: saveResult.error || 'Error desconocido al guardar'
+    };
+  }
 
   return {
     success: true,
@@ -77,35 +153,55 @@ export function crearBiblioteca(
 
 /**
  * Elimina una biblioteca
+ * CORRECCIÓN: Verifica que el guardado fue exitoso
  */
-export function eliminarBiblioteca(id: string): boolean {
+export function eliminarBiblioteca(id: string): { success: boolean; error?: string } {
   try {
     const bibliotecas = getBibliotecas();
     const filtered = bibliotecas.filter(b => b.id !== id);
-    saveBibliotecas(filtered);
-    return true;
+    
+    if (filtered.length === bibliotecas.length) {
+      return { success: false, error: 'Biblioteca no encontrada' };
+    }
+    
+    const saveResult = saveBibliotecas(filtered);
+    
+    if (!saveResult.success) {
+      return { success: false, error: saveResult.error };
+    }
+    
+    return { success: true };
   } catch (error) {
-    console.error('Error deleting biblioteca:', error);
-    return false;
+    return { success: false, error: `Error al eliminar: ${error}` };
   }
 }
 
 /**
  * Activa/desactiva una biblioteca
+ * CORRECCIÓN: Verifica que el guardado fue exitoso
  */
-export function toggleBiblioteca(id: string): boolean {
+export function toggleBiblioteca(id: string): { success: boolean; error?: string } {
   try {
     const bibliotecas = getBibliotecas();
     const index = bibliotecas.findIndex(b => b.id === id);
     
-    if (index === -1) return false;
+    if (index === -1) {
+      return { success: false, error: 'Biblioteca no encontrada' };
+    }
     
     bibliotecas[index].activa = !bibliotecas[index].activa;
-    saveBibliotecas(bibliotecas);
-    return true;
+    
+    const saveResult = saveBibliotecas(bibliotecas);
+    
+    if (!saveResult.success) {
+      // Revertir cambio si falla el guardado
+      bibliotecas[index].activa = !bibliotecas[index].activa;
+      return { success: false, error: saveResult.error };
+    }
+    
+    return { success: true };
   } catch (error) {
-    console.error('Error toggling biblioteca:', error);
-    return false;
+    return { success: false, error: `Error al cambiar estado: ${error}` };
   }
 }
 
@@ -191,4 +287,35 @@ export function getEstadisticas(): {
     totalColores,
     formatos
   };
+}
+
+/**
+ * Exporta todas las bibliotecas como JSON
+ */
+export function exportarBibliotecas(): string {
+  const bibliotecas = getBibliotecas();
+  return JSON.stringify(bibliotecas, null, 2);
+}
+
+/**
+ * Importa bibliotecas desde JSON
+ */
+export function importarBibliotecas(json: string): { success: boolean; count: number; error?: string } {
+  try {
+    const bibliotecas = JSON.parse(json) as BibliotecaColor[];
+    
+    if (!Array.isArray(bibliotecas)) {
+      return { success: false, count: 0, error: 'El JSON debe ser un array de bibliotecas' };
+    }
+    
+    const saveResult = saveBibliotecas(bibliotecas);
+    
+    if (!saveResult.success) {
+      return { success: false, count: 0, error: saveResult.error };
+    }
+    
+    return { success: true, count: bibliotecas.length };
+  } catch (error) {
+    return { success: false, count: 0, error: `Error al importar: ${error}` };
+  }
 }

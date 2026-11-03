@@ -7,14 +7,17 @@ import {
   toggleBiblioteca,
   getEstadisticas 
 } from '../../services/gestorBibliotecas';
+import { parseColorFile } from '../../services/parserCSV';
 import { Upload, Trash2, ToggleLeft, ToggleRight, BookOpen, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function CargadorBibliotecas() {
   const [bibliotecas, setBibliotecas] = useState<BibliotecaColor[]>(getBibliotecas());
   const [nombreBiblioteca, setNombreBiblioteca] = useState('');
   const [preview, setPreview] = useState<ColorPantone[] | null>(null);
+  const [previewCompleto, setPreviewCompleto] = useState<{ total: number; validos: number; rechazados: number } | null>(null);
   const [errores, setErrores] = useState<string[]>([]);
   const [mensajeExito, setMensajeExito] = useState('');
+  const [cargando, setCargando] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const estadisticas = getEstadisticas();
@@ -26,22 +29,48 @@ export default function CargadorBibliotecas() {
     setErrores([]);
     setMensajeExito('');
     setPreview(null);
+    setPreviewCompleto(null);
+    setCargando(true);
 
     const reader = new FileReader();
+    
+    reader.onerror = () => {
+      setCargando(false);
+      setErrores(['Error al leer el archivo. Verifique que sea un archivo válido.']);
+    };
+    
     reader.onload = (e) => {
-      const content = e.target?.result as string;
-      
-      // Importar temporalmente para preview
-      const { parseColorFile } = require('../../services/parserCSV');
-      const result = parseColorFile(content, file.name);
-      
-      if (result.success && result.colores.length > 0) {
-        setPreview(result.colores.slice(0, 10)); // Mostrar primeros 10
-        if (result.errores.length > 0) {
-          setErrores(result.errores);
+      try {
+        const content = e.target?.result as string;
+        
+        if (!content || content.trim() === '') {
+          setCargando(false);
+          setErrores(['El archivo está vacío']);
+          return;
         }
-      } else {
-        setErrores(result.errores.length > 0 ? result.errores : ['No se encontraron colores válidos']);
+        
+        // Usar import estático (CORRECCIÓN: eliminado require())
+        const result = parseColorFile(content, file.name);
+        
+        setCargando(false);
+        
+        if (result.success && result.colores.length > 0) {
+          setPreview(result.colores.slice(0, 10)); // Mostrar primeros 10
+          setPreviewCompleto({
+            total: result.totalProcesados,
+            validos: result.totalValidos,
+            rechazados: result.totalProcesados - result.totalValidos
+          });
+          
+          if (result.errores.length > 0) {
+            setErrores(result.errores.slice(0, 10)); // Limitar a 10 errores
+          }
+        } else {
+          setErrores(result.errores.length > 0 ? result.errores : ['No se encontraron colores válidos en el archivo']);
+        }
+      } catch (error) {
+        setCargando(false);
+        setErrores([`Error inesperado al procesar el archivo: ${error}`]);
       }
     };
     
@@ -55,22 +84,50 @@ export default function CargadorBibliotecas() {
       return;
     }
 
+    setCargando(true);
+    setErrores([]);
+    setMensajeExito('');
+
     const reader = new FileReader();
+    
+    reader.onerror = () => {
+      setCargando(false);
+      setErrores(['Error al leer el archivo']);
+    };
+    
     reader.onload = (e) => {
-      const content = e.target?.result as string;
-      const result = crearBiblioteca(nombreBiblioteca, content, file.name);
-      
-      if (result.success && result.biblioteca) {
-        setBibliotecas(getBibliotecas());
-        setMensajeExito(`Biblioteca "${nombreBiblioteca}" cargada con ${result.biblioteca.totalColores} colores`);
-        setNombreBiblioteca('');
-        setPreview(null);
-        setErrores(result.errores);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
+      try {
+        const content = e.target?.result as string;
+        const result = crearBiblioteca(nombreBiblioteca, content, file.name);
+        
+        setCargando(false);
+        
+        if (result.success && result.biblioteca) {
+          setBibliotecas(getBibliotecas());
+          setMensajeExito(`✅ Biblioteca "${nombreBiblioteca}" cargada con ${result.biblioteca.totalColores} colores`);
+          setNombreBiblioteca('');
+          setPreview(null);
+          setPreviewCompleto(null);
+          
+          // Mostrar errores de parseo si los hay (pero la importación fue exitosa)
+          if (result.errores.length > 0) {
+            setErrores(result.errores);
+          }
+          
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        } else {
+          // Error de guardado o parseo
+          const erroresFinales = [...result.errores];
+          if (result.saveError) {
+            erroresFinales.unshift(`❌ Error de guardado: ${result.saveError}`);
+          }
+          setErrores(erroresFinales);
         }
-      } else {
-        setErrores(result.errores);
+      } catch (error) {
+        setCargando(false);
+        setErrores([`Error inesperado: ${error}`]);
       }
     };
     
@@ -141,6 +198,37 @@ export default function CargadorBibliotecas() {
             />
           </div>
 
+          {/* Estado de carga */}
+          {cargando && (
+            <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-3">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-sm text-blue-300">Procesando archivo...</span>
+              </div>
+            </div>
+          )}
+
+          {/* Resumen de validación */}
+          {previewCompleto && (
+            <div className="bg-gray-900/50 rounded-lg p-3">
+              <div className="text-xs text-gray-400 mb-2 font-semibold">Resumen de validación:</div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-blue-900/30 rounded p-2">
+                  <div className="text-lg font-bold text-blue-400">{previewCompleto.total}</div>
+                  <div className="text-[10px] text-gray-400">Procesados</div>
+                </div>
+                <div className="bg-green-900/30 rounded p-2">
+                  <div className="text-lg font-bold text-green-400">{previewCompleto.validos}</div>
+                  <div className="text-[10px] text-gray-400">Válidos</div>
+                </div>
+                <div className="bg-red-900/30 rounded p-2">
+                  <div className="text-lg font-bold text-red-400">{previewCompleto.rechazados}</div>
+                  <div className="text-[10px] text-gray-400">Rechazados</div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Preview de colores */}
           {preview && preview.length > 0 && (
             <div className="bg-gray-900/50 rounded-lg p-3">
@@ -191,11 +279,20 @@ export default function CargadorBibliotecas() {
 
           <button
             onClick={handleConfirmarImportacion}
-            disabled={!nombreBiblioteca.trim() || !preview}
+            disabled={!nombreBiblioteca.trim() || !preview || cargando}
             className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
-            <Upload className="w-4 h-4" />
-            Confirmar Importación
+            {cargando ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Procesando...
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4" />
+                Confirmar Importación
+              </>
+            )}
           </button>
         </div>
       </div>

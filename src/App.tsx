@@ -7,6 +7,7 @@ import TintasBaseManager from "./components/TintasBaseManager";
 import IteracionPanel from "./components/IteracionPanel";
 import ColorConversionTestPanel from "./components/ColorConversionTestPanel";
 import CIEDE2000ValidationPanel from "./components/CIEDE2000ValidationPanel";
+import ValidationPanel from "./components/ValidationPanel";
 import PantoneDatabaseViewer from "./components/PantoneDatabaseViewer";
 import PantoneImporter from "./components/PantoneImporter";
 import CargadorBibliotecas from "./components/Bibliotecas/CargadorBibliotecas";
@@ -271,6 +272,7 @@ export default function App() {
               <p className="text-gray-400 text-sm">Verificación de conversiones RGB ↔ LAB y precisión Delta E</p>
             </div>
             
+            <ValidationPanel />
             <CIEDE2000ValidationPanel />
             <ColorConversionTestPanel />
           </div>
