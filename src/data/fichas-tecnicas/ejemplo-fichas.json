@@ -1,0 +1,114 @@
+[
+  {
+    "id": "ficha-001",
+    "nombre": "EkoCure ANCORA F2 YEP - Pantone 185 C",
+    "proveedor": "Flint Group",
+    "tipoTinta": "UV Flexo",
+    "pantoneRef": "185 C",
+    "sustrato": "Film BOPP",
+    "condicionesImpresion": {
+      "anilox": "360 lpi / 4.0 BCM",
+      "velocidad": "150 m/min",
+      "temperatura": "60°C"
+    },
+    "observaciones": "Excelente adherencia en PE y PP. Baja migración, apto contacto alimentario."
+  },
+  {
+    "id": "ficha-002",
+    "nombre": "EkoCure ANCORA F2 YEP - Pantone 489 C",
+    "proveedor": "Flint Group",
+    "tipoTinta": "UV Flexo",
+    "pantoneRef": "489 C",
+    "sustrato": "Plástico Blanco",
+    "condicionesImpresion": {
+      "anilox": "360 lpi / 4.0 BCM",
+      "velocidad": "120 m/min",
+      "temperatura": "55°C"
+    },
+    "observaciones": "Color rojo anaranjado. Buena opacidad y brillo."
+  },
+  {
+    "id": "ficha-003",
+    "nombre": "Flexocure LEAP - Pantone 355 C",
+    "proveedor": "Flint Group",
+    "tipoTinta": "UV Flexo",
+    "pantoneRef": "355 C",
+    "sustrato": "Papel Couché",
+    "condicionesImpresion": {
+      "anilox": "400 lpi / 3.5 BCM",
+      "velocidad": "180 m/min",
+      "temperatura": "65°C"
+    },
+    "observaciones": "Verde intenso. Excelente resistencia a la luz (8/8)."
+  },
+  {
+    "id": "ficha-004",
+    "nombre": "EkoCure ANCORA F2 YEP - Pantone 300 C",
+    "proveedor": "Flint Group",
+    "tipoTinta": "UV Flexo",
+    "pantoneRef": "300 C",
+    "sustrato": "Plástico Transparente",
+    "condicionesImpresion": {
+      "anilox": "500 lpi / 2.8 BCM",
+      "velocidad": "200 m/min",
+      "temperatura": "70°C"
+    },
+    "observaciones": "Azul proceso. Alta transparencia, ideal para ventanas."
+  },
+  {
+    "id": "ficha-005",
+    "nombre": "Flexocure LEAP - Pantone 116 C",
+    "proveedor": "Flint Group",
+    "tipoTinta": "UV Flexo",
+    "pantoneRef": "116 C",
+    "sustrato": "Papel Offset",
+    "condicionesImpresion": {
+      "anilox": "360 lpi / 6.0 BCM",
+      "velocidad": "100 m/min",
+      "temperatura": "50°C"
+    },
+    "observaciones": "Amarillo puro. Alta fuerza tintórea, bajo consumo."
+  },
+  {
+    "id": "ficha-006",
+    "nombre": "Tinta Blanca Cobertora - General",
+    "proveedor": "Flint Group",
+    "tipoTinta": "UV Flexo",
+    "pantoneRef": "",
+    "sustrato": "Multi-sustrato",
+    "condicionesImpresion": {
+      "anilox": "250 lpi / 10.0 BCM",
+      "velocidad": "80 m/min",
+      "temperatura": "45°C"
+    },
+    "observaciones": "Base blanca cobertora. Alta opacidad, excelente cubrición."
+  },
+  {
+    "id": "ficha-007",
+    "nombre": "Barniz UV Brillante - Acabado",
+    "proveedor": "Flint Group",
+    "tipoTinta": "UV Barniz",
+    "pantoneRef": "",
+    "sustrato": "Todos",
+    "condicionesImpresion": {
+      "anilox": "600 lpi / 2.2 BCM",
+      "velocidad": "250 m/min",
+      "temperatura": "75°C"
+    },
+    "observaciones": "Barniz de alto brillo. Resistente al rayado y productos químicos."
+  },
+  {
+    "id": "ficha-008",
+    "nombre": "EkoCure ANCORA F2 YEP - Pantone 286 C",
+    "proveedor": "Flint Group",
+    "tipoTinta": "UV Flexo",
+    "pantoneRef": "286 C",
+    "sustrato": "Film Metalizado",
+    "condicionesImpresion": {
+      "anilox": "360 lpi / 4.0 BCM",
+      "velocidad": "130 m/min",
+      "temperatura": "60°C"
+    },
+    "observaciones": "Azul reflex. Excelente adherencia en superficies metalizadas."
+  }
+]
