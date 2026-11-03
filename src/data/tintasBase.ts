@@ -1,6 +1,24 @@
 // Tintas base para formulación en flexografía
 // Adaptado a Flint Group EkoCure ANCORA F2 YEP
 // Cada tinta tiene su contribución LAB por gramo de tinta en la mezcla
+//
+// ⚠️ ADVERTENCIA IMPORTANTE:
+// Los valores LAB, fuerzas tintóreas, opacidades y propiedades listadas son
+// APROXIMACIONES ORIENTATIVAS basadas en datos genéricos del sector.
+// NO son valores certificados ni verificados contra fichas técnicas oficiales.
+//
+// Para uso industrial REAL, es IMPRESCINDIBLE:
+// 1. Verificar cada valor con las fichas técnicas oficiales de Flint Group
+// 2. Medir los valores LAB reales con espectrofotómetro calibrado
+// 3. Determinar la fuerza tintórea real mediante pruebas de drawdown
+// 4. Validar opacidad y propiedades con pruebas en sustrato real
+// 5. Confirmar resistencia a luz, solventes, jabón, grasa y álcalis
+//
+// Los códigos Flint (ej: "ANCORA-F2-Y012") son REFERENCIALES y deben
+// confirmarse con el catálogo oficial actualizado de Flint Group.
+//
+// Las formulaciones calculadas con estos datos son ORIENTATIVAS y deben
+// validarse mediante pruebas en prensa antes de su uso en producción.
 
 export type FamiliaTinta = 
   | 'standard-process'  // CMYK estándar

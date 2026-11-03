@@ -2,13 +2,28 @@
  * Base de datos expandida de colores Pantone Solid Coated
  * Fuente: Dataset open source unofficial-pantone-solid-coated-2024-v5
  * 
- * NOTA: Los valores LAB son aproximaciones no oficiales.
- * Para uso profesional, consultar las guías físicas de Pantone.
+ * ⚠️ ADVERTENCIA LEGAL Y TÉCNICA:
+ * 
+ * 1. Estos datos son APROXIMACIONES NO OFICIALES extraídas de un repositorio
+ *    de código abierto. NO son valores certificados por Pantone LLC.
+ * 
+ * 2. Los valores LAB pueden diferir de las guías físicas oficiales de Pantone
+ *    debido a variaciones en el proceso de extracción y conversión.
+ * 
+ * 3. Para uso profesional, impresión comercial o control de calidad, es
+ *    IMPRESCINDIBLE consultar las guías físicas oficiales de Pantone o
+ *    utilizar la API oficial de Pantone Connect.
+ * 
+ * 4. Las formulaciones basadas en estos colores son ORIENTATIVAS y deben
+ *    validarse mediante pruebas físicas antes de su uso en producción.
+ * 
+ * 5. PANTONE® es una marca registrada de Pantone LLC. El uso de estos datos
+ *    es bajo responsabilidad del usuario.
  * 
  * Estructura:
  * - code: Código Pantone (ej: "PMS 185 C")
  * - name: Nombre descriptivo
- * - L, a, b: Valores CIELAB (D65/2°)
+ * - L, a, b: Valores CIELAB (D65/2°) - APROXIMADOS
  * - hex: Color RGB aproximado para visualización
  * - category: Categoría de color
  */

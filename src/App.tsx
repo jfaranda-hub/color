@@ -11,6 +11,7 @@ import PantoneDatabaseViewer from "./components/PantoneDatabaseViewer";
 import PantoneImporter from "./components/PantoneImporter";
 import CargadorBibliotecas from "./components/Bibliotecas/CargadorBibliotecas";
 import GestorFichasTecnicas from "./components/FichasTecnicas/GestorFichasTecnicas";
+import FormulasMaestrasPanel from "./components/FormulasMaestrasPanel";
 import LegalDisclaimer from "./components/LegalDisclaimer";
 import { PantoneColor } from "./data/pantoneLab";
 import { Sustrato } from "./data/sustratos";
@@ -22,7 +23,7 @@ import { cargarBibliotecaBase } from "./services/cargaAutomatica";
 import { Beaker, Sparkles, ChevronRight, AlertCircle, Palette, TestTube, BookOpen, Library, FileText } from "lucide-react";
 
 type Step = "config" | "formulacion" | "iteracion";
-type Tab = "formulacion" | "tintas" | "tests" | "pantones" | "bibliotecas" | "fichas";
+type Tab = "formulacion" | "tintas" | "tests" | "pantones" | "bibliotecas" | "fichas" | "formulas";
 
 export default function App() {
   const [step, setStep] = useState<Step>("config");
@@ -221,6 +222,17 @@ export default function App() {
               <FileText className="w-4 h-4" />
               Fichas Técnicas
             </button>
+            <button
+              onClick={() => setActiveTab("formulas")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === "formulas"
+                  ? "bg-orange-600 text-white"
+                  : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Fórmulas
+            </button>
           </div>
 
           {/* Step indicator */}
@@ -295,6 +307,17 @@ export default function App() {
             </div>
             
             <GestorFichasTecnicas />
+          </div>
+        )}
+
+        {activeTab === "formulas" && (
+          <div className="max-w-7xl mx-auto space-y-6">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-black mb-2">Fórmulas Maestras Versionadas</h2>
+              <p className="text-gray-400 text-sm">Gestiona recetas de fabricación con control de versiones</p>
+            </div>
+            
+            <FormulasMaestrasPanel />
           </div>
         )}
 

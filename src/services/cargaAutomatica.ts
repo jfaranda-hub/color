@@ -10,7 +10,7 @@ import { parsePantoneCSV } from './parserCSV';
 import { crearBiblioteca, getBibliotecas } from './gestorBibliotecas';
 
 const BIBLIOTECA_BASE_ID = 'biblioteca-base-pantone-2024';
-const BIBLIOTECA_BASE_NOMBRE = 'Pantone Solid Coated 2024 (3,219 colores)';
+const BIBLIOTECA_BASE_NOMBRE = 'Pantone Solid Coated 2024 (50 colores)';
 
 /**
  * Verifica si la biblioteca base ya está cargada
@@ -42,7 +42,7 @@ export async function cargarBibliotecaBase(): Promise<{
   }
 
   try {
-    console.log('📚 Cargando biblioteca base de colores Pantone (3,219 colores)...');
+    console.log('📚 Cargando biblioteca base de colores Pantone (50 colores)...');
     console.log('📂 Fuente: https://github.com/aj90909/unofficial-pantone-solid-coated-2024-v5');
     
     // Intentar cargar el archivo CSV
@@ -65,7 +65,10 @@ export async function cargarBibliotecaBase(): Promise<{
       throw new Error(`No se encontraron colores válidos. Errores: ${parseResult.errores.join(', ')}`);
     }
 
-    // Crear la biblioteca base
+    // Limitar a 50 colores para la biblioteca base
+    const coloresLimitados = parseResult.colores.slice(0, 50);
+    
+    // Crear la biblioteca base con solo 50 colores
     const result = crearBiblioteca(
       BIBLIOTECA_BASE_NOMBRE,
       csvContent,
@@ -73,16 +76,19 @@ export async function cargarBibliotecaBase(): Promise<{
     );
 
     if (result.success && result.biblioteca) {
-      // Forzar el ID específico para la biblioteca base
+      // Forzar el ID específico para la biblioteca base y limitar a 50 colores
       const bibliotecas = getBibliotecas();
       const index = bibliotecas.findIndex(b => b.id === result.biblioteca!.id);
       if (index !== -1) {
         bibliotecas[index].id = BIBLIOTECA_BASE_ID;
         bibliotecas[index].activa = true;
+        bibliotecas[index].colores = coloresLimitados;
+        bibliotecas[index].totalColores = coloresLimitados.length;
         localStorage.setItem('flexcolor_bibliotecas', JSON.stringify(bibliotecas));
       }
 
-      console.log(`✅ Biblioteca base cargada exitosamente: ${parseResult.totalValidos} colores Pantone`);
+      console.log(`✅ Biblioteca base cargada exitosamente: ${coloresLimitados.length} colores Pantone (de ${parseResult.totalValidos} totales)`);
+      console.log('ℹ️ Para cargar los 3,219 colores completos, usa la pestaña "Bibliotecas"');
       
       if (result.errores.length > 0) {
         console.warn(`⚠️  Advertencias durante el parseo: ${result.errores.length}`);
